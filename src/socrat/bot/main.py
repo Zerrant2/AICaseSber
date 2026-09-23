@@ -22,7 +22,7 @@ async def main() -> None:
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is required")
     logging.basicConfig(level=settings.log_level)
-    from socrat.app import build_services
+    from socrat.app import build_services, close_services
 
     services = await build_services(settings)
     engine = create_engine(settings)
@@ -42,6 +42,7 @@ async def main() -> None:
     finally:
         await bot.session.close()
         await engine.dispose()
+        await close_services(services)
 
 
 def run() -> None:
