@@ -1,0 +1,13 @@
+{
+  "example_variants.json": "02d451583c4f5efdfac7ec16fea83a94cb6e0194fe13e277db20bc699840d24b",
+  "observation_rules.json": "0e29b1ec603ec731f393f5f1a6c49cfa9bb55ed010e613fe298ffc5c703c6aca",
+  "outcomes_reference.json": "6b39771d0a539363580b50cb4589622a83b33bf613193a74a72d4ae4d0717083",
+  "output_structure.json": "0ba8c6d8dbe7c9b8080520677cb14a837c737899605cdc12a26d8dd826941c50",
+  "README.txt": "388a9fa402a0b1ef526a5ca4bbe6f51fcc78d34ba202e349882ed2f90566df26",
+  "source_registry.json": "09534b30c7143fc7e7f07fb7ca93e23dfb0b33b4cbd46f3ad7b8d7d1ca558603",
+  "synthetic_responses.json": "7cb7465327c517b160b436708f20a432cdd72abaac1f3e9f71e2ddb7a3e17f98",
+  "teacher_request.json": "e34e5392577e33e932179db65073204233de753812d95f19451811ba21701701",
+  "tests.json": "3df978ef199c60ff1f9f5a076c88918c042a1ab2051cd7acf145a34f8126d55b",
+  "ПОЛЯ_И_ПОРЯДОК_ПРОВЕРКИ.txt": "8ac4014ddf97ea66f620d9b52e0e059921922587408381a03d1978a0b971818e",
+  "Примеры_работ_и_комментарии.docx": "880fbc08a33a33f1e0dcc7a1017295365974df8698b296dc7a1e05141087d024"
+}

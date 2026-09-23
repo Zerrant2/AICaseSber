@@ -1,0 +1,59 @@
+{
+  "note": "P01 и другие коды — внутренние идентификаторы этого набора, не официальные номера ФГОС. Описания — краткий пересказ, не цитаты. ФРП используется для конкретизации требований ФГОС в выбранном предмете. Набор не охватывает весь стандарт.",
+  "outcomes": [
+    {
+      "outcome_id": "P01",
+      "type": "предметный",
+      "paraphrase": "Умножение и деление в пределах изученного материала 3 класса.",
+      "source_id": "FRP-MATH-2025",
+      "page": 23,
+      "section": "Предметные результаты к концу обучения в 3 классе",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=23"
+    },
+    {
+      "outcome_id": "P02",
+      "type": "предметный",
+      "paraphrase": "Решение текстовой задачи в одно-два действия с планом и проверкой.",
+      "source_id": "FRP-MATH-2025",
+      "page": 23,
+      "section": "Предметные результаты к концу обучения в 3 классе",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=23"
+    },
+    {
+      "outcome_id": "C01",
+      "type": "познавательные УУД",
+      "paraphrase": "Представление задачи моделью и установление отношений между данными.",
+      "source_id": "FRP-MATH-2025",
+      "page": 19,
+      "section": "Метапредметные результаты — познавательные УУД",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=19"
+    },
+    {
+      "outcome_id": "R01",
+      "type": "регулятивные УУД",
+      "paraphrase": "Планирование решения и проверка действий; обнаружение и исправление ошибки.",
+      "source_id": "FRP-MATH-2025",
+      "page": 20,
+      "section": "Метапредметные результаты — самоорганизация и самоконтроль",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=20"
+    },
+    {
+      "outcome_id": "K01",
+      "type": "коммуникативные УУД",
+      "paraphrase": "Понятное объяснение способа решения с использованием условия задачи.",
+      "source_id": "FRP-MATH-2025",
+      "page": 19,
+      "section": "Метапредметные результаты — общение",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=19"
+    },
+    {
+      "outcome_id": "L01",
+      "type": "личностная направленность",
+      "paraphrase": "Осмысление применения математики и собственных учебных затруднений.",
+      "source_id": "FRP-MATH-2025",
+      "page": 18,
+      "section": "Личностные результаты",
+      "source_url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf#page=18"
+    }
+  ]
+}
