@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from socrat.config import get_settings
 from socrat.storage import SessionStore, create_engine, init_db, session_factory
 
-from . import auth
+from . import auth, work_flow
 from .middleware import AuthMiddleware
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,10 @@ async def main() -> None:
     dispatcher.message.outer_middleware(middleware)
     dispatcher.callback_query.outer_middleware(middleware)
     dispatcher.include_router(auth.router)
+    dispatcher.include_router(work_flow.router)
     dispatcher["services"] = services
     dispatcher["settings"] = settings
+    dispatcher["generation_controller"] = work_flow.GenerationController(settings.max_concurrent_generations)
     bot = Bot(token=token)
     try:
         logger.info("Starting Telegram long polling")
