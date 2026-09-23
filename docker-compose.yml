@@ -1,0 +1,18 @@
+services:
+  bot:
+    build: .
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Для локальной модели укажите LLM_BASE_URL=http://ollama:11434/v1,
+  # LLM_API_KEY=ollama и LLM_MODEL=имя установленной модели в .env.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   volumes:
+  #     - ollama_models:/root/.ollama
+  #   restart: unless-stopped
+
+# volumes:
+#   ollama_models:
