@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from socrat.config import get_settings
 from socrat.storage import SessionStore, create_engine, init_db, session_factory
 
-from . import admin_panel, analysis_flow, auth, work_flow
+from . import admin_panel, analysis_flow, auth, feedback_flow, work_flow
 from .middleware import AuthMiddleware
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ async def main() -> None:
     dispatcher.include_router(admin_panel.router)
     dispatcher.include_router(work_flow.router)
     dispatcher.include_router(analysis_flow.router)
+    dispatcher.include_router(feedback_flow.router)
     dispatcher["services"] = services
     dispatcher["settings"] = settings
     dispatcher["generation_controller"] = work_flow.GenerationController(settings.max_concurrent_generations)

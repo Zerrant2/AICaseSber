@@ -118,3 +118,27 @@ ADMIN_READY_YES = "да"
 ADMIN_READY_NO = "нет"
 ADMIN_NO_PROBLEMS = "нет"
 ADMIN_PROGRESS = "⏳ {description}"
+
+FOLLOWUP_NO_WORK = "Работа или задание не найдено. Создайте работу заново."
+FOLLOWUP_THANKS = "Спасибо, отзыв сохранён."
+FOLLOWUP_COMMENT_PROMPT = "Что не так с заданием? Комментарий необязателен; без данных детей."
+FOLLOWUP_COMMENT_LONG = "Комментарий должен быть не длиннее 1000 символов."
+FOLLOWUP_SKIP = "Пропустить"
+FOLLOWUP_PERSONAL_DATA = "Похоже, в тексте есть имя или фамилия. Уберите данные ребёнка."
+FOLLOWUP_CHOOSE_TASK = "Выберите задание для перегенерации."
+FOLLOWUP_WISH_PROMPT = "Напишите пожелание к новому заданию без данных детей или пропустите."
+FOLLOWUP_WISH_LONG = "Пожелание должно быть не длиннее 500 символов."
+FOLLOWUP_REGENERATING = "⏳ Перегенерирую задание…"
+FOLLOWUP_PROGRESS = "⏳ {description}"
+FOLLOWUP_REGENERATED = "Задание обновлено. Новые документы отправлены."
+FOLLOWUP_REGENERATE_FAILED = "Не удалось перегенерировать задание. Попробуйте ещё раз."
+FOLLOWUP_NEXT_ACTION = "Что сделать дальше?"
+FOLLOWUP_CHOOSE_OBSERVATION = "Выберите задание или вопрос для рефлексии."
+FOLLOWUP_RESPONSE_PROMPT = (
+    "Вставьте ответ ученика без имени. Сообщение с ответом будет удалено после разбора."
+)
+FOLLOWUP_REFLECTION_PROMPT = (
+    "Вопрос: {question}\nВставьте ответ без имени. Сообщение будет удалено после разбора."
+)
+FOLLOWUP_RESPONSE_LENGTH = "Ответ должен содержать от 1 до 3000 символов."
+FOLLOWUP_OBSERVATION_FAILED = "Не удалось разобрать ответ. Попробуйте ещё раз."
