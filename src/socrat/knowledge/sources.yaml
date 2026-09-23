@@ -1,0 +1,23 @@
+# Реестр документов нормативной базы. ВЛАДЕЛЕЦ: Gemini (knowledge).
+# Каждый URL ОБЯЗАТЕЛЬНО проверить вручную (открывается, это нужный документ, актуальная редакция).
+# Поля: source_id, title, url, doc_type (fgos|fop|frp), edu_levels, subject_id, grades, note
+# Затравка — два источника из кейса SK01 (проверены организаторами 21.09.2026):
+sources:
+  - source_id: FGOS-NOO-286
+    title: "ФГОС НОО, приказ Минпросвещения России от 31.05.2021 № 286"
+    url: "https://publication.pravo.gov.ru/Document/View/0001202107050028"
+    doc_type: fgos
+    edu_levels: [noo]
+    subject_id: null
+    grades: [1, 2, 3, 4]
+    note: "Первоначальное опубликование; последующие изменения не проверялись"
+  - source_id: FRP-MATH-2025
+    title: "Федеральная рабочая программа «Математика» 1–4 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf"
+    doc_type: frp
+    edu_levels: [noo]
+    subject_id: math
+    grades: [1, 2, 3, 4]
+    note: "Источник справочника кейса SK01 (стр. 18–20, 23 по нумерации PDF)"
+  # TODO(Gemini): ФГОС ООО (287), ФГОС СОО (413, актуальная редакция), ФОП НОО/ООО/СОО,
+  # ФРП по всем предметам 1–11 (edsoo.ru). См. docs/tasks/TASKS_GEMINI.md, задача G1.

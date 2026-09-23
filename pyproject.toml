@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "socrat"
+version = "0.1.0"
+description = "Сократ — Telegram-помощник педагога: диагностические работы по ФГОС и анализ типичных ошибок (кейс SK01)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "T004 Fazbear Entertainment, Inc." }]
+# Правило: каждый агент добавляет зависимости своего модуля в своём PR, в свою секцию-комментарий.
+dependencies = [
+  # --- contract / общее (Claude) ---
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "pyyaml>=6.0",
+  # --- llm / core (Claude) ---
+  "openai>=1.40",
+  "tenacity>=8.3",
+  "jinja2>=3.1",
+  "sympy>=1.12",
+  "pymorphy3>=2.0",
+  # --- bot / storage / export (Codex) ---
+  "aiogram>=3.10",
+  "sqlalchemy[asyncio]>=2.0",
+  "aiosqlite>=0.20",
+  "argon2-cffi>=23.1",
+  "python-docx>=1.1",
+  # --- knowledge (Gemini) ---
+  "httpx>=0.27",
+  "pymupdf>=1.24",
+  "rank-bm25>=0.2.2",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+socrat = ["prompts/*.md", "knowledge/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+markers = [
+  "llm: тест ходит в реальную LLM (нужен LLM_API_KEY); по умолчанию пропускается в CI",
+  "network: тест ходит в интернет",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/socrat/contracts/__init__.py" = ["F401"]
+"src/socrat/testing/fakes.py" = ["F401"]

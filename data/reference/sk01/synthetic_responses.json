@@ -1,0 +1,170 @@
+[
+  {
+    "response_id": "EASY-1-FULL",
+    "task_id": "EASY-1",
+    "fictional": true,
+    "response": "3 × 4 = 12. Одинаковых групп 3, в каждой 4 карточек.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "EASY-1-SHORT",
+    "task_id": "EASY-1",
+    "fictional": true,
+    "response": "12",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "EASY-2-FULL",
+    "task_id": "EASY-2",
+    "fictional": true,
+    "response": "12 : 3 = 4. Проверка: 4 × 3 = 12.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "EASY-2-SHORT",
+    "task_id": "EASY-2",
+    "fictional": true,
+    "response": "4",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "EASY-3-FULL",
+    "task_id": "EASY-3",
+    "fictional": true,
+    "response": "Сложены число полок и число карточек на полке. Нужно умножение: 3 × 4 = 12.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "EASY-3-SHORT",
+    "task_id": "EASY-3",
+    "fictional": true,
+    "response": "12",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "EASY-4-FULL",
+    "task_id": "EASY-4",
+    "fictional": true,
+    "response": "Сначала всего 3 × 4 = 12, затем 12 − 2 = 10. Проверка: 10 + 2 = 12.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "EASY-4-SHORT",
+    "task_id": "EASY-4",
+    "fictional": true,
+    "response": "10",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "BASIC-1-FULL",
+    "task_id": "BASIC-1",
+    "fictional": true,
+    "response": "4 × 6 = 24. Одинаковых групп 4, в каждой 6 карточек.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "BASIC-1-SHORT",
+    "task_id": "BASIC-1",
+    "fictional": true,
+    "response": "24",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "BASIC-2-FULL",
+    "task_id": "BASIC-2",
+    "fictional": true,
+    "response": "24 : 4 = 6. Проверка: 6 × 4 = 24.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "BASIC-2-SHORT",
+    "task_id": "BASIC-2",
+    "fictional": true,
+    "response": "6",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "BASIC-3-FULL",
+    "task_id": "BASIC-3",
+    "fictional": true,
+    "response": "Сложены число полок и число карточек на полке. Нужно умножение: 4 × 6 = 24.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "BASIC-3-SHORT",
+    "task_id": "BASIC-3",
+    "fictional": true,
+    "response": "24",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "BASIC-4-FULL",
+    "task_id": "BASIC-4",
+    "fictional": true,
+    "response": "Сначала всего 4 × 6 = 24, затем 24 − 5 = 19. Проверка: 19 + 5 = 24.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "BASIC-4-SHORT",
+    "task_id": "BASIC-4",
+    "fictional": true,
+    "response": "19",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "ADVANCED-1-FULL",
+    "task_id": "ADVANCED-1",
+    "fictional": true,
+    "response": "7 × 8 = 56. Одинаковых групп 7, в каждой 8 карточек.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "ADVANCED-1-SHORT",
+    "task_id": "ADVANCED-1",
+    "fictional": true,
+    "response": "56",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "ADVANCED-2-FULL",
+    "task_id": "ADVANCED-2",
+    "fictional": true,
+    "response": "56 : 7 = 8. Проверка: 8 × 7 = 56.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "ADVANCED-2-SHORT",
+    "task_id": "ADVANCED-2",
+    "fictional": true,
+    "response": "8",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "ADVANCED-3-FULL",
+    "task_id": "ADVANCED-3",
+    "fictional": true,
+    "response": "Сложены число полок и число карточек на полке. Нужно умножение: 7 × 8 = 56.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "ADVANCED-3-SHORT",
+    "task_id": "ADVANCED-3",
+    "fictional": true,
+    "response": "56",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  },
+  {
+    "response_id": "ADVANCED-4-FULL",
+    "task_id": "ADVANCED-4",
+    "fictional": true,
+    "response": "Сначала всего 7 × 8 = 56, затем 56 − 9 = 47. Проверка: 47 + 9 = 56.",
+    "expected_observation": "Предметный ответ верен. Фиксировать только те действия, которые видны в приведённой записи; не приписывать скрытый ход мысли."
+  },
+  {
+    "response_id": "ADVANCED-4-SHORT",
+    "task_id": "ADVANCED-4",
+    "fictional": true,
+    "response": "47",
+    "expected_observation": "Предметное число верно; для объяснения, планирования и проверки недостаточно наблюдений."
+  }
+]
