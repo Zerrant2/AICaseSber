@@ -1,1 +1,1 @@
-"""Модуль bot. ВЛАДЕЛЕЦ: Codex. См. docs/tasks/ и ARCHITECTURE.md."""
+"""Telegram interface for the Socrat teacher assistant."""
