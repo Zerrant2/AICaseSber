@@ -20,7 +20,7 @@ from socrat.contracts import (
     UUDObservationItem,
 )
 
-from .mathcheck import answer_value, fmt, numbers_in, parse_number
+from .mathcheck import answer_value, fmt, numbers_in, parse_number, word_numbers
 
 EXPLAIN = ("потому", "так как", "т.к", "значит", "поэтому", "чтобы", "ведь", "нужно", "надо", "получается")
 CHECK = ("провер", "обратн", "сверил", "сверяю", "проверка")
@@ -51,9 +51,68 @@ DIFFICULTY = (
 
 _EXPR_RE = re.compile(r"\d+\s*[×x*·:/+\-−]\s*\d+")
 
+# Текст педагога вместо записи ученика: вопрос о помощи или описание затруднения в третьем лице.
+_TEACHER_RE = (
+    re.compile(r"\b(как|чем|что)\b[^.?!]{0,40}\b(помочь|поможет|делать|сделать|работать|объяснить|научить)"),
+    re.compile(r"\b(подскажите|посоветуйте|помогите|что посоветуете|что делать)\b"),
+    re.compile(
+        r"\b(ученик|ученица|ребен\w*|ребён\w*|дети|детям|школьник\w*|он|она|они)\b[^.?!]{0,30}"
+        r"\b(не справил\w*|не справля\w*|не понима\w*|не понял\w*|не може\w*|не умеет|путает|путают|"
+        r"ошибает\w*|ошибаю\w*|затрудня\w*|плохо|не получает\w*)"
+    ),
+)
+
+# Альтернативные объяснения — свои для каждой группы, чтобы не повторять одно и то же трижды.
+ALTERNATIVES = {
+    UUDGroup.COGNITIVE: [
+        "Ребёнок мог выбрать действие в уме и записать только результат.",
+    ],
+    UUDGroup.REGULATORY: [
+        "Проверку или план могли выполнить устно — по записи это не видно.",
+        "Возможно, требование записать проверку или план было не замечено.",
+    ],
+    UUDGroup.COMMUNICATIVE: [
+        "Ребёнок мог понимать решение, но затрудниться сформулировать объяснение письменно.",
+    ],
+}
+
+
+def looks_like_teacher_text(text: str, kind: TaskKind | None = None) -> bool:
+    """Вопрос педагога («как ему помочь?») или описание ученика в третьем лице, а не его запись.
+
+    Срабатывает только на текст без цифр: запись решения ребёнка почти всегда содержит числа.
+    В заданиях «найди ошибку» ребёнок сам пишет о чужом решении в третьем лице («он не понял…»),
+    поэтому там учитываются только вопросы о помощи.
+    """
+    low = text.lower().replace("ё", "е")
+    if re.search(r"\d", low):
+        return False
+    patterns = _TEACHER_RE[:2] if kind == TaskKind.FIND_ERROR else _TEACHER_RE
+    return any(r.search(low) for r in patterns)
+
 
 def _has(text: str, words: tuple[str, ...]) -> bool:
-    return any(w in text for w in words)
+    return any(
+        re.search(rf"(?<![а-яё]){re.escape(w)}", text)
+        and not (w == "потом" and "потому" in text and not re.search(r"\bпотом\b", text))
+        for w in words
+    )
+
+
+_FINAL_RE = re.compile(
+    r"(?:ответ|всего|итого|получит\w*|получил\w*|будет|осталось|стало)\s*[:\-—]?\s*([^.;!?\n]*)"
+)
+
+
+def _final_number(segment: str):
+    """Число сразу после «всего / ответ / получится…» — цифрами или словами."""
+    found = None
+    for m in _FINAL_RE.finditer(segment):
+        tail = m.group(1)[:40]
+        nums = numbers_in(tail) or word_numbers(tail)
+        if nums:
+            found = nums[0]
+    return found
 
 
 class RuleResponseObserver:
@@ -65,16 +124,51 @@ class RuleResponseObserver:
         nums = numbers_in(text)
         expected = answer_value(task.expected_answer)
 
+        if text and looks_like_teacher_text(text, task.kind):
+            return ResponseObservation(
+                task_id=task.task_id,
+                response_text=text,
+                subject_status=SubjectObservation.NO_ANSWER,
+                subject_basis="Это похоже на вопрос или описание педагога, а не на запись ученика — "
+                "предметный результат по нему не оценивается.",
+                uud=[],
+                summary_ru=(
+                    "Похоже, это не ответ ученика, а вопрос или описание затруднения. Разбор ответа работает "
+                    "только по обезличенной записи решения ребёнка (как он написал в работе). "
+                    "Чтобы получить гипотезы о причинах трудности и приёмы помощи, выберите в меню "
+                    "«Анализ типичной ошибки» и опишите затруднение там."
+                ),
+                limitations=["Выводы о ребёнке по вопросу педагога не делаются."],
+            )
+
         # ---- предметная часть
         answer_m = re.search(r"ответ\s*[:\-—]?\s*(-?\d+(?:[.,]\d+)?)", low)
         before_check = re.split(r"провер", low, maxsplit=1)[0]
         main_nums = numbers_in(before_check) or nums
-        final = parse_number(answer_m.group(1)) if answer_m else (main_nums[-1] if main_nums else None)
+        if not main_nums:
+            main_nums = word_numbers(before_check) or word_numbers(low)
+            nums = nums or word_numbers(low)
+        eq = re.findall(r"=\s*(-?\d+(?:[.,]\d+)?)", before_check)
+        if answer_m:
+            final = parse_number(answer_m.group(1))
+        elif eq:
+            final = parse_number(eq[-1])  # результат последнего записанного действия
+        else:
+            final = _final_number(before_check)
+        if final is None:
+            if main_nums and len(re.findall(r"[а-яёa-z]{2,}", before_check)) <= 3:
+                final = main_nums[-1]  # «12», «12 карточек», «двенадцать»
         if not text:
             status, basis = SubjectObservation.NO_ANSWER, "Ответ не записан."
         elif expected is None:
             status = SubjectObservation.PARTIAL
             basis = "Ответ не числовой — автоматически правильность не определить, оцените по эталону в методичке."
+        elif final is None:
+            status = SubjectObservation.NO_ANSWER
+            basis = (
+                "В записи нет итогового числа, поэтому верность ответа автоматически не определить. Это не "
+                "значит, что ответ неверный: сверьте запись с эталоном в методичке."
+            )
         elif final == expected:
             status, basis = SubjectObservation.CORRECT, f"Итоговое число {fmt(final)} совпадает с ожидаемым."
         elif expected in nums:
@@ -84,16 +178,12 @@ class RuleResponseObserver:
             )
         else:
             status = SubjectObservation.ERROR
-            basis = (
-                f"Итоговое число {fmt(final)} не совпадает с ожидаемым ({task.expected_answer})."
-                if final is not None
-                else "В записи нет числового ответа."
-            )
+            basis = f"Итоговое число {fmt(final)} не совпадает с ожидаемым ({task.expected_answer})."
 
         # ---- УУД
         has_expr = bool(_EXPR_RE.search(text))
         words = len(re.findall(r"[а-яёa-z]{2,}", low))
-        number_only = bool(text) and words == 0
+        number_only = bool(text) and words == 0 and not has_expr
         items: list[UUDObservationItem] = []
         required = {i.group: i for i in task.uud_indicators}
         for group in UUDGroup:
@@ -111,10 +201,7 @@ class RuleResponseObserver:
             st, why = self._uud_status(group, task, low, has_expr, words)
             alts = []
             if st in (UUDObservation.NOT_SHOWN, UUDObservation.PARTIAL):
-                alts = [
-                    "Ребёнок мог выполнить действие устно или в уме — по записи это не видно.",
-                    "Возможно, не понял, что требуется записать объяснение/проверку.",
-                ]
+                alts = list(ALTERNATIVES[group])
             items.append(
                 UUDObservationItem(
                     group=group, outcome_id=ind.outcome_id, status=st, basis=why, alternatives=alts

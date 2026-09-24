@@ -1,0 +1,13 @@
+{
+  "generator_version": "1.0.0",
+  "prompt_version": "1.1",
+  "provider": "https://openrouter.ai/api/v1",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "tokens_in": 28723,
+  "tokens_out": 37454,
+  "cost_usd": 0.036529,
+  "duration_s": 125.9,
+  "llm_calls": 6,
+  "repairs": 2,
+  "is_fixture": false
+}

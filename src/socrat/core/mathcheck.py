@@ -150,3 +150,66 @@ def answer_value(text: str | None) -> Fraction | None:
     main = re.split(r"провер", low, maxsplit=1)[0]
     nums = numbers_in(main) or numbers_in(low)
     return nums[-1] if nums else None
+
+
+# ------------------------------------------------------ числа словами (ответы учеников)
+
+_UNITS = {
+    "ноль": 0, "один": 1, "одна": 1, "одно": 1, "два": 2, "две": 2, "три": 3, "четыре": 4, "пять": 5,
+    "шесть": 6, "семь": 7, "восемь": 8, "девять": 9, "десять": 10, "одиннадцать": 11, "двенадцать": 12,
+    "тринадцать": 13, "четырнадцать": 14, "пятнадцать": 15, "шестнадцать": 16, "семнадцать": 17,
+    "восемнадцать": 18, "девятнадцать": 19,
+}  # fmt: skip
+_TENS = {
+    "двадцать": 20, "тридцать": 30, "сорок": 40, "пятьдесят": 50, "шестьдесят": 60, "семьдесят": 70,
+    "восемьдесят": 80, "девяносто": 90,
+}  # fmt: skip
+_HUNDREDS = {
+    "сто": 100, "двести": 200, "триста": 300, "четыреста": 400, "пятьсот": 500, "шестьсот": 600,
+    "семьсот": 700, "восемьсот": 800, "девятьсот": 900, "тысяча": 1000,
+}  # fmt: skip
+
+
+def _numeral_lemma(word: str) -> str:
+    w = word.lower().replace("ё", "е")
+    if w in _UNITS or w in _TENS or w in _HUNDREDS:
+        return w
+    try:
+        from socrat.core.validators import _morph
+
+        morph = _morph()
+    except Exception:  # pragma: no cover
+        morph = None
+    if morph is None:
+        return w
+    for p in morph.parse(w):
+        if "NUMR" in p.tag:
+            return p.normal_form.replace("ё", "е")
+    return w
+
+
+def word_numbers(text: str | None) -> list[Fraction]:
+    """Числа, записанные словами: «двадцать четыре карточки» → [24]; «сорока пяти» → [45]."""
+    out: list[Fraction] = []
+    current: int | None = None
+    last_rank = 10_000
+    for token in re.findall(r"[А-Яа-яЁё]+", text or ""):
+        lemma = _numeral_lemma(token)
+        value = _HUNDREDS.get(lemma) or _TENS.get(lemma) or _UNITS.get(lemma)
+        if value is None and lemma != "ноль":
+            if current is not None:
+                out.append(Fraction(current))
+                current, last_rank = None, 10_000
+            continue
+        value = value or 0
+        rank = 100 if value >= 100 else (10 if value >= 20 else 1)
+        if current is not None and rank < last_rank and not (last_rank == 10 and value >= 10):
+            current += value
+        else:
+            if current is not None:
+                out.append(Fraction(current))
+            current = value
+        last_rank = rank
+    if current is not None:
+        out.append(Fraction(current))
+    return out
