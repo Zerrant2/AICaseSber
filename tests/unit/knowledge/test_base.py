@@ -194,6 +194,62 @@ def test_check_topic_g16_cross_grade_rejection(test_kb: LocalKnowledgeBase):
         assert res.in_program, f"Topic '{topic}' should be in program for algebra 7"
 
 
+def test_check_topic_g17_different_grade_topics(test_kb: LocalKnowledgeBase):
+    """Проверка G17: темы из программы предмета, но другого класса (алгебра 7/8, геометрия 7/9)."""
+    # 1. Темы соседних классов в 5-9 классах:
+    # «Квадратные уравнения» в 7 классе алгебры (по ФРП это 8 класс)
+    res_alg7 = test_kb.check_topic(7, "algebra", "Квадратные уравнения")
+    assert not res_alg7.in_program
+    assert res_alg7.confidence <= 0.5
+    assert "Тема есть в программе предмета, но в другом классе" in res_alg7.matched_topics
+    assert len(res_alg7.suggestions) > 0
+
+    # «Векторы» в 7 классе геометрии (по ФРП это 9 класс)
+    res_geom7 = test_kb.check_topic(7, "geometry", "Векторы")
+    assert not res_geom7.in_program
+    assert res_geom7.confidence <= 0.5
+    assert "Тема есть в программе предмета, но в другом классе" in res_geom7.matched_topics
+    assert len(res_geom7.suggestions) > 0
+
+    # 2. В своих классах те же темы должны быть in_program=True:
+    res_alg8 = test_kb.check_topic(8, "algebra", "Квадратные уравнения")
+    assert res_alg8.in_program
+    assert res_alg8.confidence >= 0.5
+
+    res_geom9 = test_kb.check_topic(9, "geometry", "Векторы")
+    assert res_geom9.in_program
+    assert res_geom9.confidence >= 0.5
+
+
+def test_check_topic_input_validation_and_edge_cases(test_kb: LocalKnowledgeBase):
+    """Проверка валидации входных данных и граничных случаев в check_topic."""
+    # Недопустимые номера классов
+    for invalid_grade in (-1, 0, 12):
+        res = test_kb.check_topic(invalid_grade, "math", "Сложение")
+        assert not res.in_program
+        assert res.confidence == 0.0
+
+    # Предмет не изучается в этом классе
+    res_no_subj = test_kb.check_topic(3, "physics", "Тепловые явления")
+    assert not res_no_subj.in_program
+    assert res_no_subj.confidence == 0.0
+
+    res_alg5 = test_kb.check_topic(5, "algebra", "Уравнения")
+    assert not res_alg5.in_program
+    assert res_alg5.confidence == 0.0
+
+    # Пустая строка или пробелы
+    res_empty = test_kb.check_topic(3, "math", "   ")
+    assert not res_empty.in_program
+    assert res_empty.confidence == 0.0
+    assert len(res_empty.suggestions) > 0
+
+    # Разный регистр и знаки препинания
+    res_case = test_kb.check_topic(8, "geometry", "ТЕОРЕМА ПИФАГОРА")
+    assert res_case.in_program
+    assert res_case.confidence >= 0.5
+
+
 def test_check_topic_fallback_without_index_or_pages(tmp_path: Path):
     """Проверка работы check_topic на чистом клоне без index/ и pages/ (G10)."""
     real_settings = get_settings()

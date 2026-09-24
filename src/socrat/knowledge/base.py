@@ -445,12 +445,42 @@ class LocalKnowledgeBase:
         return None
 
     def check_topic(self, grade: int, subject_id: str, topic: str) -> TopicCheck:
-        """Проверяет соответствие темы учителя программе класса по предмету (G10, G14)."""
+        """Проверяет соответствие темы учителя программе класса по предмету (G10, G14, G17)."""
+        try:
+            EduLevel.for_grade(grade)
+        except ValueError:
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=[],
+                evidence=[],
+            )
+
+        valid_subjects = {s.subject_id for s in self.list_subjects(grade)}
+        if not valid_subjects or subject_id not in valid_subjects:
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=[],
+                evidence=[],
+            )
+
         target_outcomes = [
             o
             for o in self._outcomes
             if o.grade == grade and (o.subject_id is None or o.subject_id == subject_id)
         ]
+
+        if not topic or not topic.strip():
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=self._extract_suggestions(grade, subject_id, target_outcomes),
+                evidence=[],
+            )
 
         # 1. Поиск по фрагментам содержания и предметных результатов индекса (если индекс не пуст)
         hits: list[SearchHit] = []
@@ -465,18 +495,9 @@ class LocalKnowledgeBase:
             # Фильтруем результаты: тема должна покрывать >= 60% значимых слов (G16)
             hits = [h for h in raw_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
 
-        best_score = hits[0].score if hits else 0.0
-        in_prog = best_score >= 0.4
-
-        matched_topics: list[str] = []
-        for h in hits:
-            if h.score >= 0.4:
-                first_line = h.chunk.text.split("\n")[0].strip()
-                matched_topics.append(first_line[:80])
-
-        # 2. Если по разделу содержания ничего не нашлось (или индекс пуст),
-        # ищем по формулировкам результатов каталога этого класса и предмета (G14)
-        if not in_prog and target_outcomes:
+        # 2. Поиск по формулировкам результатов каталога этого класса и предмета (G14, G17)
+        outcome_hits: list[SearchHit] = []
+        if target_outcomes:
             temp_chunks = [
                 Chunk(
                     chunk_id=o.outcome_id,
@@ -498,87 +519,123 @@ class LocalKnowledgeBase:
                 k=5,
             )
             outcome_hits = [h for h in raw_outcome_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
+
+        # Проверяем, есть ли тема в результатах этого класса из каталога (G17)
+        in_this_grade_outcome = any(topic_coverage(topic, o.text) >= 0.60 for o in target_outcomes) or any(
+            h.score >= 0.4 for h in outcome_hits
+        )
+
+        # Проверяем, есть ли тема в результатах других классов этого же предмета (G17)
+        other_grade_outcomes = [
+            o
+            for o in self._outcomes
+            if o.subject_id == subject_id and o.grade is not None and o.grade != grade
+        ]
+        in_other_grade_outcome = any(topic_coverage(topic, o.text) >= 0.60 for o in other_grade_outcomes)
+
+        has_explicit_grade_chunk = any(h.chunk.grade == grade and h.score >= 0.4 for h in hits)
+
+        in_this_grade = in_this_grade_outcome or (has_explicit_grade_chunk and not in_other_grade_outcome)
+
+        matched_topics: list[str] = []
+        best_score = hits[0].score if hits else 0.0
+
+        if in_this_grade:
+            in_prog = True
             outcome_best_score = outcome_hits[0].score if outcome_hits else 0.0
-            if outcome_best_score >= 0.4:
-                in_prog = True
-                best_score = max(best_score, outcome_best_score)
+            best_score = max(best_score, outcome_best_score)
+            if not hits and outcome_hits:
                 hits = outcome_hits
-                for h in outcome_hits:
-                    if h.score >= 0.4:
-                        first_line = h.chunk.text.split("\n")[0].strip()
-                        matched_topics.append(first_line[:80])
+            for h in hits:
+                if h.score >= 0.4:
+                    first_line = h.chunk.text.split("\n")[0].strip()
+                    matched_topics.append(first_line[:80])
+        else:
+            in_prog = False
+            has_general_chunk_hit = any(h.score >= 0.4 for h in hits)
+            if has_general_chunk_hit or in_other_grade_outcome:
+                matched_topics = ["Тема есть в программе предмета, но в другом классе"]
+                best_score = min(0.5, max(best_score, 0.4))
+            else:
+                matched_topics = []
+                best_score = 0.1
 
         # 3. Подсказки тем (до 5 коротких названий)
         suggestions: list[str] = []
         if not in_prog:
-            # Сначала пытаемся извлечь темы из фрагментов раздела «Содержание обучения» этого класса
-            content_chunks = [
-                c
-                for c in self.index.chunks
-                if c.grade == grade
-                and (c.subject_id is None or c.subject_id == subject_id)
-                and c.kind == ChunkKind.CONTENT
-            ]
-            seen_topics: set[str] = set()
-            ignore_keywords = {"универсальные", "планирование", "результаты", "деятельность", "действия"}
-            for ch in content_chunks:
-                for line in ch.text.split("\n"):
-                    for sentence in re.split(r"[;\.]", line):
-                        s_clean = sentence.strip()
-                        if 10 <= len(s_clean) <= 60 and not any(
-                            w in s_clean.lower() for w in ignore_keywords
-                        ):
-                            s_title = s_clean[0].upper() + s_clean[1:]
-                            if s_title not in seen_topics:
-                                seen_topics.add(s_title)
-                                suggestions.append(s_title)
-                                if len(suggestions) >= 5:
-                                    break
-                    if len(suggestions) >= 5:
-                        break
+            suggestions = self._extract_suggestions(grade, subject_id, target_outcomes)
 
-            # Если подсказок меньше 5 (или нет content_chunks), берём из каталога результатов (G14)
-            if len(suggestions) < 5 and target_outcomes:
-                for o in target_outcomes:
-                    first_phrase = o.text.split("\n")[0].split(";")[0].split(".")[0].strip()
-                    clean_phrase = re.sub(
-                        r"^(Числа и вычисления|Алгебраические выражения|Уравнения и неравенства|Функции|Наглядная геометрия|Геометрические фигуры|Язык и речь|СИСТЕМА ЯЗЫКА|Текст|Фонетика|Орфография|Лексикология|Морфемика|Морфология|Синтаксис)\s+",
-                        "",
-                        first_phrase,
-                        flags=re.I,
-                    ).strip()
-                    if 10 <= len(clean_phrase) <= 60 and not any(
-                        w in clean_phrase.lower() for w in ignore_keywords
-                    ):
-                        s_title = clean_phrase[0].upper() + clean_phrase[1:]
+        return TopicCheck(
+            in_program=in_prog,
+            confidence=min(1.0, max(0.1, best_score)),
+            matched_topics=list(dict.fromkeys(matched_topics))[:3],
+            suggestions=suggestions[:5],
+            evidence=hits,
+        )
+
+    def _extract_suggestions(self, grade: int, subject_id: str, target_outcomes: list[Outcome]) -> list[str]:
+        """Извлекает до 5 подсказок тем программы для указанного класса и предмета."""
+        suggestions: list[str] = []
+        # Сначала пытаемся извлечь темы из фрагментов раздела «Содержание обучения» этого класса
+        content_chunks = [
+            c
+            for c in self.index.chunks
+            if c.grade == grade
+            and (c.subject_id is None or c.subject_id == subject_id)
+            and c.kind == ChunkKind.CONTENT
+        ]
+        seen_topics: set[str] = set()
+        ignore_keywords = {"универсальные", "планирование", "результаты", "деятельность", "действия"}
+        for ch in content_chunks:
+            for line in ch.text.split("\n"):
+                for sentence in re.split(r"[;\.]", line):
+                    s_clean = sentence.strip()
+                    if 10 <= len(s_clean) <= 60 and not any(w in s_clean.lower() for w in ignore_keywords):
+                        s_title = s_clean[0].upper() + s_clean[1:]
                         if s_title not in seen_topics:
                             seen_topics.add(s_title)
                             suggestions.append(s_title)
                             if len(suggestions) >= 5:
                                 break
+                if len(suggestions) >= 5:
+                    break
 
-            # Fallback для 3 класса математики при необходимости
-            if len(suggestions) < 5 and grade == 3 and subject_id == "math":
-                math3_default = [
-                    "Умножение и деление в пределах 100",
-                    "Решение текстовых задач в одно-два действия",
-                    "Сложение и вычитание в пределах 1000",
-                    "Периметр и площадь прямоугольника",
-                    "Деление с остатком",
-                ]
-                for d in math3_default:
-                    if d not in suggestions:
-                        suggestions.append(d)
+        # Если подсказок меньше 5 (или нет content_chunks), берём из каталога результатов (G14)
+        if len(suggestions) < 5 and target_outcomes:
+            for o in target_outcomes:
+                first_phrase = o.text.split("\n")[0].split(";")[0].split(".")[0].strip()
+                clean_phrase = re.sub(
+                    r"^(Числа и вычисления|Алгебраические выражения|Уравнения и неравенства|Функции|Наглядная геометрия|Геометрические фигуры|Язык и речь|СИСТЕМА ЯЗЫКА|Текст|Фонетика|Орфография|Лексикология|Морфемика|Морфология|Синтаксис)\s+",
+                    "",
+                    first_phrase,
+                    flags=re.I,
+                ).strip()
+                if 10 <= len(clean_phrase) <= 60 and not any(
+                    w in clean_phrase.lower() for w in ignore_keywords
+                ):
+                    s_title = clean_phrase[0].upper() + clean_phrase[1:]
+                    if s_title not in seen_topics:
+                        seen_topics.add(s_title)
+                        suggestions.append(s_title)
                         if len(suggestions) >= 5:
                             break
 
-        return TopicCheck(
-            in_program=in_prog,
-            confidence=min(1.0, max(0.1, best_score)) if in_prog else 0.1,
-            matched_topics=list(dict.fromkeys(matched_topics))[:3],
-            suggestions=suggestions[:5],
-            evidence=hits,
-        )
+        # Fallback для 3 класса математики при необходимости
+        if len(suggestions) < 5 and grade == 3 and subject_id == "math":
+            math3_default = [
+                "Умножение и деление в пределах 100",
+                "Решение текстовых задач в одно-два действия",
+                "Сложение и вычитание в пределах 1000",
+                "Периметр и площадь прямоугольника",
+                "Деление с остатком",
+            ]
+            for d in math3_default:
+                if d not in suggestions:
+                    suggestions.append(d)
+                    if len(suggestions) >= 5:
+                        break
+
+        return suggestions[:5]
 
     def get_outcomes(
         self,
@@ -714,7 +771,7 @@ class LocalKnowledgeBase:
             sid = pdf_path.stem
             if progress:
                 await progress(f"Парсинг PDF {sid}…")
-            parse_and_save_pdf(pdf_path, sid, pages_dir)
+            parse_and_save_pdf(pdf_path, sid, pages_dir, sources_file=self.settings.sources_file)
 
         # 3. G4: Нарезка на фрагменты (чанкинг)
         chunks_dir = self.settings.knowledge_dir / "chunks"
