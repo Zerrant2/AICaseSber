@@ -197,6 +197,19 @@ async def _send_lines(message: Message, lines: list[str]) -> None:
         await message.answer(current)
 
 
+async def _offer_observation_actions(message: Message, work_id: str) -> None:
+    await message.answer(
+        texts.FOLLOWUP_NEXT_ACTION,
+        reply_markup=_keyboard(
+            [
+                [(texts.FOLLOWUP_OBSERVE_AGAIN, f"observe:{work_id}")],
+                [(texts.FOLLOWUP_REGENERATE_AGAIN, f"regen:{work_id}")],
+                [(texts.FOLLOWUP_FEEDBACK_ACTION, f"fbmenu:{work_id}")],
+            ]
+        ),
+    )
+
+
 @router.callback_query(F.data.startswith("fbmenu:"))
 async def feedback_menu(callback: CallbackQuery, services: Services) -> None:
     await callback.answer()
@@ -389,6 +402,8 @@ async def response_input(
     except Exception:
         logger.exception("Response observation failed for task_id=%s", task.task_id)
         await message.answer(texts.FOLLOWUP_OBSERVATION_FAILED)
+        return
+    await _offer_observation_actions(message, work.work_id)
 
 
 @router.message(FollowupFlow.reflection, F.text)
@@ -402,7 +417,8 @@ async def reflection_input(
     if not _anonymous(answer):
         await message.answer(texts.FOLLOWUP_PERSONAL_DATA)
         return
-    question = (await state.get_data()).get("question", "")
+    data = await state.get_data()
+    question = data.get("question", "")
     if not question:
         await state.clear()
         await message.answer(texts.FOLLOWUP_NO_WORK)
@@ -422,3 +438,6 @@ async def reflection_input(
     except Exception:
         logger.exception("Reflection observation failed")
         await message.answer(texts.FOLLOWUP_OBSERVATION_FAILED)
+        return
+    if work_id := data.get("work_id"):
+        await _offer_observation_actions(message, work_id)
