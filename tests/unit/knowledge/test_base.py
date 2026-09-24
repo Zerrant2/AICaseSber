@@ -72,18 +72,65 @@ def test_list_subjects(test_kb: LocalKnowledgeBase):
 
 
 def test_list_subjects_ooo(test_kb: LocalKnowledgeBase):
-    """Проверка доступности предметов ООО для 5 и 7 классов (G12)."""
+    """Проверка доступности только предметов с каталогами (G12, G15)."""
+    subjs_7 = [s.subject_id for s in test_kb.list_subjects(7)]
+    # list_subjects(7) содержит строго russian, algebra, geometry, biology, physics
+    assert subjs_7 == ["russian", "algebra", "geometry", "biology", "physics"]
+
+    # Для 10 и 11 классов список должен быть пустым
+    assert test_kb.list_subjects(10) == []
+    assert test_kb.list_subjects(11) == []
+
+    # Для 5 класса
     subjs_5 = {s.subject_id for s in test_kb.list_subjects(5)}
-    subjs_7 = {s.subject_id for s in test_kb.list_subjects(7)}
+    assert subjs_5 == {"russian", "math", "biology"}
 
-    assert "math" in subjs_5
-    assert "russian" in subjs_5
-    assert "biology" in subjs_5
 
-    assert "algebra" in subjs_7
-    assert "geometry" in subjs_7
-    assert "physics" in subjs_7
-    assert "biology" in subjs_7
+def test_check_topic_g14(test_kb: LocalKnowledgeBase):
+    """Проверка G14: 5 типичных тем для algebra 7, russian 5, physics 8, и отсечение Фотосинтеза."""
+    # Алгебра 7 класс (5 типичных тем)
+    algebra_7_topics = [
+        "Линейная функция и её график",
+        "Степень с натуральным показателем",
+        "Одночлены и многочлены",
+        "Системы линейных уравнений",
+        "Формулы сокращенного умножения",
+    ]
+    for topic in algebra_7_topics:
+        res = test_kb.check_topic(7, "algebra", topic)
+        assert res.in_program, f"Topic '{topic}' should be in program for algebra 7"
+        assert res.confidence >= 0.4
+
+    # Русский язык 5 класс (5 типичных тем)
+    russian_5_topics = [
+        "Фонетический анализ слова",
+        "Синонимы, антонимы и омонимы",
+        "Лексическое значение слова",
+        "Морфемный состав слова",
+        "Правописание безударных гласных в корне",
+    ]
+    for topic in russian_5_topics:
+        res = test_kb.check_topic(5, "russian", topic)
+        assert res.in_program, f"Topic '{topic}' should be in program for russian 5"
+        assert res.confidence >= 0.4
+
+    # Физика 8 класс (5 типичных тем)
+    physics_8_topics = [
+        "Теплопередача и виды теплопередачи",
+        "Закон Ома для участка цепи",
+        "Электрический ток и закон Джоуля-Ленца",
+        "Испарение и конденсация",
+        "Плавление и кристаллизация",
+    ]
+    for topic in physics_8_topics:
+        res = test_kb.check_topic(8, "physics", topic)
+        assert res.in_program, f"Topic '{topic}' should be in program for physics 8"
+        assert res.confidence >= 0.4
+
+    # Отрицательный тест: Фотосинтез для математики 3 класса
+    res_neg = test_kb.check_topic(3, "math", "Фотосинтез и клеточное дыхание")
+    assert not res_neg.in_program
+    assert len(res_neg.suggestions) > 0
 
 
 def test_get_outcomes_contains_sk01(test_kb: LocalKnowledgeBase):
@@ -142,7 +189,10 @@ def test_check_topic_fallback_without_index_or_pages(tmp_path: Path):
     # Проверка fallback по результатам каталога
     res_ok = kb.check_topic(3, "math", "Умножение и деление чисел")
     assert res_ok.in_program
-    assert len(res_ok.suggestions) > 0
+
+    res_fail = kb.check_topic(3, "math", "Фотосинтез и клеточное дыхание")
+    assert not res_fail.in_program
+    assert len(res_fail.suggestions) > 0
 
 
 def test_status_diagnostics_reports_missing_pages_or_catalog(tmp_path: Path):

@@ -99,6 +99,15 @@ class SectionState:
         if not stripped:
             return False
 
+        # Если встречается заголовок нового раздела документа, сбрасываем in_thematic (G14)
+        if (
+            RE_CONTENT_MAIN.match(stripped)
+            or RE_EXPLANATORY.match(stripped)
+            or RE_PLANNED_RESULTS.match(stripped)
+            or "ФЕДЕРАЛЬНАЯ РАБОЧАЯ ПРОГРАММА" in stripped.upper()
+        ):
+            self.in_thematic = False
+
         if RE_THEMATIC.match(stripped):
             self.in_thematic = True
             self.top_section = "Тематическое планирование"

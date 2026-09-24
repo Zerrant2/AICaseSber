@@ -183,6 +183,29 @@ class LocalKnowledgeBase:
                 except Exception as e:
                     logger.debug("Could not save index to %s: %s", index_dir, e)
 
+        # Проверяем, все ли страницы из pages/ присутствуют в индексе
+        if pages_dir.exists():
+            indexed_sources = {c.source_id for c in self.index.chunks}
+            missing_pages = [pf for pf in sorted(pages_dir.glob("*.jsonl")) if pf.stem not in indexed_sources]
+            if missing_pages:
+                new_chunks: list[Chunk] = []
+                for pf in missing_pages:
+                    sid = pf.stem
+                    doc = self._sources.get(sid)
+                    s_id = doc.subject_id if doc else None
+                    try:
+                        doc_chunks = chunk_pages_file(pf, sid, s_id)
+                        new_chunks.extend(doc_chunks)
+                    except Exception as e:
+                        logger.warning("Failed to chunk %s: %s", pf, e)
+                if new_chunks:
+                    all_chunks = list(self.index.chunks) + new_chunks
+                    self.index = KnowledgeIndex(all_chunks)
+                    try:
+                        self.index.save(index_dir)
+                    except Exception as e:
+                        logger.debug("Could not save updated index to %s: %s", index_dir, e)
+
         self.retriever = Retriever(self.index, self._sources, self.settings)
 
         # 5. Диагностика целостности для админки (G13)
@@ -199,24 +222,19 @@ class LocalKnowledgeBase:
         self._ready = bool(self._sources and self._outcomes)
 
     def list_subjects(self, grade: int) -> list[Subject]:
-        """Возвращает предметы для класса, по которым в базе есть хотя бы одна ФРП."""
+        """Возвращает только те предметы для класса, по которым есть хотя бы один результат в каталоге (G15)."""
         try:
-            edu_lvl = EduLevel.for_grade(grade)
+            EduLevel.for_grade(grade)
         except ValueError:
             return []
 
-        available_frp_subjects = {
-            doc.subject_id
-            for doc in self._sources.values()
-            if doc.doc_type == DocType.FRP
-            and (grade in doc.grades if doc.grades else edu_lvl in doc.edu_levels)
-            and doc.subject_id
-        } | {o.subject_id for o in self._outcomes if o.grade == grade and o.subject_id}
+        # Только предметы, у которых для этого класса есть хотя бы один результат в каталоге
+        catalog_subjects = {o.subject_id for o in self._outcomes if o.grade == grade and o.subject_id}
 
         res: list[Subject] = []
         for s in self._subjects_def:
             sid = s["subject_id"]
-            if grade in s.get("grades", []) and sid in available_frp_subjects:
+            if grade in s.get("grades", []) and sid in catalog_subjects:
                 res.append(
                     Subject(
                         subject_id=sid,
@@ -237,23 +255,36 @@ class LocalKnowledgeBase:
         return None
 
     def check_topic(self, grade: int, subject_id: str, topic: str) -> TopicCheck:
-        """Проверяет соответствие темы учителя программе класса по предмету."""
-        # Fallback для абсолютно чистого репозитория без страниц и индекса (G10)
-        if len(self.index.chunks) == 0:
-            target_outcomes = [
-                o
-                for o in self._outcomes
-                if o.grade == grade and (o.subject_id is None or o.subject_id == subject_id)
-            ]
-            if not target_outcomes:
-                return TopicCheck(
-                    in_program=False,
-                    confidence=0.0,
-                    matched_topics=[],
-                    suggestions=[],
-                    evidence=[],
-                )
+        """Проверяет соответствие темы учителя программе класса по предмету (G10, G14)."""
+        target_outcomes = [
+            o
+            for o in self._outcomes
+            if o.grade == grade and (o.subject_id is None or o.subject_id == subject_id)
+        ]
 
+        # 1. Поиск по фрагментам содержания и предметных результатов индекса (если индекс не пуст)
+        hits: list[SearchHit] = []
+        if len(self.index.chunks) > 0:
+            hits = self.retriever.search(
+                query=topic,
+                grade=grade,
+                subject_id=subject_id,
+                kinds=[ChunkKind.CONTENT, ChunkKind.SUBJECT_RESULT],
+                k=5,
+            )
+
+        best_score = hits[0].score if hits else 0.0
+        in_prog = best_score >= 0.4
+
+        matched_topics: list[str] = []
+        for h in hits:
+            if h.score >= 0.4:
+                first_line = h.chunk.text.split("\n")[0].strip()
+                matched_topics.append(first_line[:80])
+
+        # 2. Если по разделу содержания ничего не нашлось (или индекс пуст),
+        # ищем по формулировкам результатов каталога этого класса и предмета (G14)
+        if not in_prog and target_outcomes:
             temp_chunks = [
                 Chunk(
                     chunk_id=o.outcome_id,
@@ -268,56 +299,26 @@ class LocalKnowledgeBase:
                 for o in target_outcomes
             ]
             temp_index = KnowledgeIndex(temp_chunks)
-            hits = Retriever(temp_index, self._sources).search(topic, k=5)
-            best_score = hits[0].score if hits else 0.0
-            in_prog = best_score >= 0.4
-
-            matched_topics: list[str] = []
-            for h in hits:
-                if h.score >= 0.4:
-                    first_line = h.chunk.text.split("\n")[0].strip()
-                    matched_topics.append(first_line[:80])
-
-            suggestions: list[str] = []
-            for o in target_outcomes:
-                text_clean = o.text.split("\n")[0].strip().rstrip(";.")
-                if 10 <= len(text_clean) <= 60:
-                    s_title = text_clean[0].upper() + text_clean[1:]
-                    if s_title not in suggestions:
-                        suggestions.append(s_title)
-                        if len(suggestions) >= 5:
-                            break
-
-            return TopicCheck(
-                in_program=in_prog,
-                confidence=min(1.0, max(0.1, best_score)) if in_prog else 0.1,
-                matched_topics=list(dict.fromkeys(matched_topics))[:3],
-                suggestions=suggestions[:5],
-                evidence=hits,
+            outcome_hits = Retriever(temp_index, self._sources).search(
+                topic,
+                grade=grade,
+                subject_id=subject_id,
+                k=5,
             )
+            outcome_best_score = outcome_hits[0].score if outcome_hits else 0.0
+            if outcome_best_score >= 0.4:
+                in_prog = True
+                best_score = max(best_score, outcome_best_score)
+                hits = outcome_hits
+                for h in outcome_hits:
+                    if h.score >= 0.4:
+                        first_line = h.chunk.text.split("\n")[0].strip()
+                        matched_topics.append(first_line[:80])
 
-        # 1. Поиск по фрагментам содержания и предметных результатов
-        hits = self.retriever.search(
-            query=topic,
-            grade=grade,
-            subject_id=subject_id,
-            kinds=[ChunkKind.CONTENT, ChunkKind.SUBJECT_RESULT],
-            k=5,
-        )
-
-        best_score = hits[0].score if hits else 0.0
-        in_prog = best_score >= 0.4
-
-        matched_topics: list[str] = []
-        for h in hits:
-            if h.score >= 0.4:
-                first_line = h.chunk.text.split("\n")[0].strip()
-                matched_topics.append(first_line[:80])
-
-        # 2. Подсказки тем (до 5 коротких названий)
+        # 3. Подсказки тем (до 5 коротких названий)
         suggestions: list[str] = []
         if not in_prog:
-            # Извлекаем темы из фрагментов раздела «Содержание обучения» этого класса
+            # Сначала пытаемся извлечь темы из фрагментов раздела «Содержание обучения» этого класса
             content_chunks = [
                 c
                 for c in self.index.chunks
@@ -342,6 +343,26 @@ class LocalKnowledgeBase:
                                     break
                     if len(suggestions) >= 5:
                         break
+
+            # Если подсказок меньше 5 (или нет content_chunks), берём из каталога результатов (G14)
+            if len(suggestions) < 5 and target_outcomes:
+                for o in target_outcomes:
+                    first_phrase = o.text.split("\n")[0].split(";")[0].split(".")[0].strip()
+                    clean_phrase = re.sub(
+                        r"^(Числа и вычисления|Алгебраические выражения|Уравнения и неравенства|Функции|Наглядная геометрия|Геометрические фигуры|Язык и речь|СИСТЕМА ЯЗЫКА|Текст|Фонетика|Орфография|Лексикология|Морфемика|Морфология|Синтаксис)\s+",
+                        "",
+                        first_phrase,
+                        flags=re.I,
+                    ).strip()
+                    if 10 <= len(clean_phrase) <= 60 and not any(
+                        w in clean_phrase.lower() for w in ignore_keywords
+                    ):
+                        s_title = clean_phrase[0].upper() + clean_phrase[1:]
+                        if s_title not in seen_topics:
+                            seen_topics.add(s_title)
+                            suggestions.append(s_title)
+                            if len(suggestions) >= 5:
+                                break
 
             # Fallback для 3 класса математики при необходимости
             if len(suggestions) < 5 and grade == 3 and subject_id == "math":
