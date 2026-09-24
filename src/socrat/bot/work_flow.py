@@ -39,6 +39,7 @@ from . import texts
 
 logger = logging.getLogger(__name__)
 router = Router(name="work_flow")
+GENERATION_TIMEOUT_SECONDS = 600
 
 
 class WorkFlow(StatesGroup):
@@ -281,26 +282,27 @@ async def _generate(
 
     try:
         async with controller.semaphore:
-            async with ChatActionSender.upload_document(chat_id=chat_id, bot=callback.bot):
-                work = await services.generator.generate(request, progress)
-                await services.works.save(work, session.teacher_id)
-                await services.usage.add(
-                    UsageRecord(
-                        kind="generation",
-                        model=work.meta.model,
-                        tokens_in=work.meta.tokens_in,
-                        tokens_out=work.meta.tokens_out,
-                        cost_usd=work.meta.cost_usd,
-                        teacher_id=session.teacher_id,
+            async with asyncio.timeout(GENERATION_TIMEOUT_SECONDS):
+                async with ChatActionSender.upload_document(chat_id=chat_id, bot=callback.bot):
+                    work = await services.generator.generate(request, progress)
+                    await services.works.save(work, session.teacher_id)
+                    await services.usage.add(
+                        UsageRecord(
+                            kind="generation",
+                            model=work.meta.model,
+                            tokens_in=work.meta.tokens_in,
+                            tokens_out=work.meta.tokens_out,
+                            cost_usd=work.meta.cost_usd,
+                            teacher_id=session.teacher_id,
+                        )
                     )
-                )
-                student_name, teacher_name = services.exporter.filenames(work)
-                await callback.message.answer_document(
-                    BufferedInputFile(services.exporter.student_docx(work), filename=student_name)
-                )
-                await callback.message.answer_document(
-                    BufferedInputFile(services.exporter.teacher_docx(work), filename=teacher_name)
-                )
+                    student_name, teacher_name = services.exporter.filenames(work)
+                    await callback.message.answer_document(
+                        BufferedInputFile(services.exporter.student_docx(work), filename=student_name)
+                    )
+                    await callback.message.answer_document(
+                        BufferedInputFile(services.exporter.teacher_docx(work), filename=teacher_name)
+                    )
         times = "\n".join(
             f"{variant.student_label}: {variant.time_plan.total_minutes:g} мин" for variant in work.variants
         )
@@ -322,6 +324,12 @@ async def _generate(
             ),
         )
         await state.clear()
+    except TimeoutError:
+        logger.warning("Generation timed out for grade=%s subject=%s", request.grade, request.subject_id)
+        await status.edit_text(
+            texts.WORK_TIMED_OUT, reply_markup=_keyboard([[(texts.WORK_RETRY, "cw:retry")]])
+        )
+        await state.set_state(WorkFlow.confirm)
     except GenerationError as error:
         logger.warning("Generation failed for grade=%s subject=%s", request.grade, request.subject_id)
         await status.edit_text(error.message_ru, reply_markup=_keyboard([[(texts.WORK_RETRY, "cw:retry")]]))

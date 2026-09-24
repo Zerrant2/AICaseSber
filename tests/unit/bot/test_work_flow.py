@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -11,7 +12,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.methods import SendDocument, SendMessage
+from aiogram.methods import EditMessageText, SendDocument, SendMessage
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
 from socrat.app import build_services, close_services
@@ -19,6 +20,7 @@ from socrat.bot import texts, work_flow
 from socrat.bot.middleware import AuthMiddleware
 from socrat.config import get_settings
 from socrat.contracts import GuardrailCode, GuardrailIssue, GuardrailResult, Role, SessionInfo, Severity
+from socrat.storage.security import keyed_lookup, secret_bytes
 
 
 class RecordingBot(Bot):
@@ -190,3 +192,59 @@ async def test_generation_controller_rejects_second_job() -> None:
     assert not await controller.start("chat-key")
     await controller.finish("chat-key")
     assert await controller.start("chat-key")
+
+
+async def test_generation_timeout_releases_slot_and_offers_retry(settings, monkeypatch) -> None:
+    monkeypatch.setattr(work_flow, "GENERATION_TIMEOUT_SECONDS", 0.05)
+    cancelled = asyncio.Event()
+
+    async def hanging_generate(request, progress):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    services = SimpleNamespace(generator=SimpleNamespace(generate=hanging_generate))
+    state = FSMContext(MemoryStorage(), StorageKey(bot_id=123, chat_id=123, user_id=123))
+    await state.update_data(
+        grade=3,
+        subject_id="math",
+        subject_name="Математика",
+        topic="Умножение",
+        level="all",
+        uud_focus="balanced",
+        task_count=4,
+    )
+    session = SessionInfo(
+        role=Role.TEACHER,
+        nick="Учитель",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    controller = work_flow.GenerationController(1)
+    bot = RecordingBot()
+    chat = Chat(id=123, type="private")
+    message = Message(message_id=10, date=datetime.now(UTC), chat=chat, text="Создать").as_(bot)
+    callback = CallbackQuery(
+        id="generation-timeout",
+        from_user=User(id=123, is_bot=False, first_name="Teacher"),
+        chat_instance="test",
+        data="cw:gen",
+        message=message,
+    ).as_(bot)
+
+    try:
+        await work_flow._generate(callback, state, services, session, settings, controller)
+
+        assert cancelled.is_set()
+        assert await state.get_state() == work_flow.WorkFlow.confirm.state
+        assert any(
+            isinstance(method, EditMessageText) and method.text == texts.WORK_TIMED_OUT
+            for method in bot.methods
+        )
+        await asyncio.wait_for(controller.semaphore.acquire(), timeout=0.1)
+        controller.semaphore.release()
+        chat_key = keyed_lookup(secret_bytes(settings), "123")
+        assert await controller.start(chat_key)
+        await controller.finish(chat_key)
+    finally:
+        await bot.session.close()
