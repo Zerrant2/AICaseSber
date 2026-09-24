@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     work_minutes_max: int = 20
     max_tasks: int = 8
     max_concurrent_generations: int = 3
+
+    @field_validator("llm_price_in_per_1m", "llm_price_out_per_1m", mode="before")
+    @classmethod
+    def _empty_to_none(cls, v: object) -> object:
+        """Пустое значение в .env (`LLM_PRICE_IN_PER_1M=`) — это «не задано», а не ошибка."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     # --- Прочее ---
     use_fakes: bool = Field(False, description="True — бот работает на фейках (без LLM и базы)")

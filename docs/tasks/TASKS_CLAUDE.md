@@ -6,11 +6,11 @@
 - тесты: `tests/contract/`, `tests/case_sk01/`;
 - документы: `ARCHITECTURE.md`, `AGENTS.md`.
 
-## C0. Контракт v1 · ✅ сделано (PR `contract/v1`)
+## C0. Контракт v1 · ✅ сделано (PR #1)
 
 Pydantic-модели, протоколы, `Services`, `config.py`, фейки, фикстуры из данных кейса, `techniques.json`, тесты контракта, ARCHITECTURE, AGENTS, ТЗ.
 
-## C1. LLM-клиент `llm/client.py` · 🔴 к 24.09, 09:00
+## C1. LLM-клиент `llm/client.py` · ✅ сделано (ветка claude/core) · к 24.09, 09:00
 
 `OpenAICompatibleClient(settings)`, реализует `LLMClient`:
 - `AsyncOpenAI(base_url, api_key, timeout)`; для OpenRouter — заголовки `HTTP-Referer` и `X-Title`.
@@ -24,7 +24,7 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 - `embed()` — через `EMBEDDINGS_*` или `NotImplementedError`.
 - Тест на `FakeTransport` (httpx MockTransport).
 
-## C2. Промпты `prompts/` · 🔴 к 24.09, 11:00
+## C2. Промпты `prompts/` · ✅ сделано (ветка claude/core) · к 24.09, 11:00
 
 Файлы:
 - `system_methodologist.md`
@@ -46,7 +46,7 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 - решение не раскрывается в `support`;
 - арифметика — в `expression`.
 
-## C3. Валидаторы `core/validators/` · 🔴 к 24.09, 13:00
+## C3. Валидаторы `core/validators/` · ✅ сделано (ветка claude/core) · к 24.09, 13:00
 
 | Модуль | Что проверяет |
 |---|---|
@@ -58,7 +58,7 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 | `level.py` | Различие уровней по опорам и самостоятельности (T09): у лёгкого есть `support` хотя бы у половины заданий; у сложного есть требование объяснить, проверить или сравнить; числа не меньше, чем у базового |
 | `language.py` | pymorphy3-согласование «N предмет»; запрещённая лексика (ярлыки способностей, диагнозы) |
 
-## C4. Генератор `core/generator.py` · 🔴 к 24.09, 16:00
+## C4. Генератор `core/generator.py` · ✅ сделано (ветка claude/core) · к 24.09, 16:00
 
 Пайплайн по ARCHITECTURE §4:
 - уровни — параллельно (`asyncio.gather`);
@@ -67,7 +67,7 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 - `regenerate_task`;
 - `build_core(settings, knowledge, feedback, usage) -> (generator, analyzer, observer)`.
 
-## C5. Ограничители `core/guardrails.py` · 🔴 к 24.09, 14:00
+## C5. Ограничители `core/guardrails.py` · ✅ сделано (ветка claude/core) · к 24.09, 14:00
 
 | Проверка | Тест кейса |
 |---|---|
@@ -81,7 +81,7 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 
 Тексты ответов — честные, с предложением альтернатив.
 
-## C6. Анализ ошибок `core/analysis.py` · 🔴 к 24.09, 18:00
+## C6. Анализ ошибок `core/analysis.py` · ✅ сделано (ветка claude/core) · к 24.09, 18:00
 
 Контекст (результаты + приёмы) → один LLM-вызов → проверка:
 - `technique_id` есть в библиотеке;
@@ -90,14 +90,14 @@ Pydantic-модели, протоколы, `Services`, `config.py`, фейки, 
 
 Маскирование ПДн перед отправкой.
 
-## C7. Разбор ответа `core/observation.py` · 🟡 к 24.09, 19:00
+## C7. Разбор ответа `core/observation.py` · ✅ сделано (ветка claude/core) · к 24.09, 19:00
 
 Детерминированно, без LLM:
 - **предметная часть:** извлечение чисел → сравнение с ответом → статус предметного результата;
 - **УУД:** маркеры по группам (объяснение, проверка, план, схема) → статусы УУД + основание + альтернативные объяснения;
 - **рефлексия:** нейтральная формулировка (T07).
 
-## C8. Тесты кейса `tests/case_sk01/` + отчёт · 🔴 к 24.09, 22:00
+## C8. Тесты кейса `tests/case_sk01/` + отчёт · ✅ сделано (ветка claude/core) · к 24.09, 22:00
 
 - T01–T12 как pytest.
 - Часть — на фикстуре и фейках, без сети. Часть — `@pytest.mark.llm` на реальной модели: T01, T02, T09, T11.
