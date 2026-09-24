@@ -33,6 +33,19 @@ python -m socrat.knowledge status
 
 Первые две команды скачивают PDF и пересобирают каталог с индексом. Статус базы и обновление также доступны в админ-панели бота. Подробности источников и проверки страниц приведены в [отчёте](reports/knowledge_report.md).
 
+## Установка из ветки `release`
+
+Чтобы получить готовую версию, клонируйте сразу ветку `release`:
+
+```powershell
+git clone --branch release --single-branch https://github.com/Zerrant2/AICaseSber.git
+cd AICaseSber
+```
+
+Если репозиторий уже клонирован, обновите ветку командами `git fetch origin`, `git switch release`, `git pull --ff-only origin release`. Затем выполните шаги ниже: заполните `.env` и выберите локальный запуск или Docker Compose.
+
+Сообщение GitHub «Compare & pull request» после обновления `release` предлагает создать PR в `main`. Для установки оно не нужно: `release` опубликована как отдельная ветка и не сливается целиком с `main`.
+
 ## Подготовка
 
 1. Создайте бота через [@BotFather](https://core.telegram.org/bots/tutorial): отправьте `/newbot`, следуйте подсказкам и сохраните выданный токен.
