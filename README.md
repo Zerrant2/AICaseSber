@@ -37,7 +37,7 @@ python -m socrat.knowledge status
 
 1. Создайте бота через [@BotFather](https://core.telegram.org/bots/tutorial): отправьте `/newbot`, следуйте подсказкам и сохраните выданный токен.
 2. Скопируйте `.env.example` в `.env`. Заполните `TELEGRAM_BOT_TOKEN`, `ADMIN_PASSWORD` (не менее 8 символов) и `APP_SECRET` (не менее 32 символов). Секрет можно создать командой `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Файл `.env` не коммитится.
-3. Для демонстрации установите `USE_FAKES=true`. Значения `LLM_PRICE_IN_PER_1M` и `LLM_PRICE_OUT_PER_1M` задайте числами, например `0` для режима фейков: пустые значения в `.env` не проходят проверку настроек.
+3. Для демонстрации установите `USE_FAKES=true`. В этом режиме LLM не вызывается; `LLM_PRICE_IN_PER_1M` и `LLM_PRICE_OUT_PER_1M` можно оставить пустыми.
 4. Для реальной LLM создайте ключ на [странице ключей OpenRouter](https://openrouter.ai/settings/keys), укажите его в `LLM_API_KEY`, задайте `LLM_MODEL=deepseek/deepseek-v4.1-flash`, `LLM_JSON_MODE=prompt`, `LLM_MAX_TOKENS=12000` и установите `USE_FAKES=false`. Инструкции OpenRouter по [подключению API](https://openrouter.ai/docs/quickstart). Никому не отправляйте токен бота или ключ API.
 
 ### Локальный запуск
