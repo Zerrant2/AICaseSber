@@ -1,0 +1,93 @@
+subjects:
+  - subject_id: russian
+    name: "Русский язык"
+    grades: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    order: 1
+  - subject_id: literary_reading
+    name: "Литературное чтение"
+    grades: [1, 2, 3, 4]
+    order: 2
+  - subject_id: literature
+    name: "Литература"
+    grades: [5, 6, 7, 8, 9, 10, 11]
+    order: 3
+  - subject_id: foreign_language
+    name: "Иностранный язык"
+    grades: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    order: 4
+  - subject_id: math
+    name: "Математика"
+    grades: [1, 2, 3, 4, 5, 6]
+    order: 5
+  - subject_id: algebra
+    name: "Алгебра"
+    grades: [7, 8, 9, 10, 11]
+    order: 6
+  - subject_id: geometry
+    name: "Геометрия"
+    grades: [7, 8, 9, 10, 11]
+    order: 7
+  - subject_id: probability
+    name: "Вероятность и статистика"
+    grades: [7, 8, 9, 10, 11]
+    order: 8
+  - subject_id: informatics
+    name: "Информатика"
+    grades: [7, 8, 9, 10, 11]
+    order: 9
+  - subject_id: world
+    name: "Окружающий мир"
+    grades: [1, 2, 3, 4]
+    order: 10
+  - subject_id: history
+    name: "История"
+    grades: [5, 6, 7, 8, 9, 10, 11]
+    order: 11
+  - subject_id: social_studies
+    name: "Обществознание"
+    grades: [6, 7, 8, 9, 10, 11]
+    order: 12
+  - subject_id: geography
+    name: "География"
+    grades: [5, 6, 7, 8, 9, 10, 11]
+    order: 13
+  - subject_id: biology
+    name: "Биология"
+    grades: [5, 6, 7, 8, 9, 10, 11]
+    order: 14
+  - subject_id: physics
+    name: "Физика"
+    grades: [7, 8, 9, 10, 11]
+    order: 15
+  - subject_id: chemistry
+    name: "Химия"
+    grades: [8, 9, 10, 11]
+    order: 16
+  - subject_id: orkse
+    name: "Основы религиозных культур и светской этики"
+    grades: [4]
+    order: 17
+  - subject_id: odnknr
+    name: "ОДНКНР"
+    grades: [5, 6]
+    order: 18
+  - subject_id: art
+    name: "Изобразительное искусство"
+    grades: [1, 2, 3, 4, 5, 6, 7]
+    order: 19
+  - subject_id: music
+    name: "Музыка"
+    grades: [1, 2, 3, 4, 5, 6, 7, 8]
+    order: 20
+  - subject_id: technology
+    name: "Труд (технология)"
+    grades: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    order: 21
+  - subject_id: obzr
+    name: "Основы безопасности и защиты Родины"
+    grades: [8, 9, 10, 11]
+    order: 22
+  - subject_id: pe
+    name: "Физическая культура"
+    grades: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    order: 23
