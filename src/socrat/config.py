@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     llm_max_repairs: int = 2
     llm_price_in_per_1m: float | None = Field(None, description="USD за 1M входных токенов (для учёта)")
     llm_price_out_per_1m: float | None = None
+    llm_reasoning: str | None = Field(
+        None,
+        description="Только OpenRouter: off | low | medium | high. Пусто — настройка модели по умолчанию. "
+        "off/low ускоряет ответ и снижает число выходных токенов у «думающих» моделей.",
+    )
     openrouter_app_name: str = "Socrat SK01"
     openrouter_app_url: str = "https://github.com/Zerrant2/AICaseSber"
 
@@ -61,7 +66,7 @@ class Settings(BaseSettings):
     max_tasks: int = 8
     max_concurrent_generations: int = 3
 
-    @field_validator("llm_price_in_per_1m", "llm_price_out_per_1m", mode="before")
+    @field_validator("llm_price_in_per_1m", "llm_price_out_per_1m", "llm_reasoning", mode="before")
     @classmethod
     def _empty_to_none(cls, v: object) -> object:
         """Пустое значение в .env (`LLM_PRICE_IN_PER_1M=`) — это «не задано», а не ошибка."""

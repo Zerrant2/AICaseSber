@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -37,7 +38,10 @@ def main() -> int:
     if REPORT_JSON.exists():
         REPORT_JSON.unlink()
     marker = [] if "--llm" in sys.argv else ["-m", "not llm"]
-    code = subprocess.call([sys.executable, "-m", "pytest", "-q", "tests/case_sk01", *marker], cwd=ROOT)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")  # иначе кириллица в выводе pytest на Windows ломается
+    code = subprocess.call(
+        [sys.executable, "-m", "pytest", "-q", "tests/case_sk01", *marker], cwd=ROOT, env=env
+    )
     results = json.loads(REPORT_JSON.read_text(encoding="utf-8")) if REPORT_JSON.exists() else {}
     tests = json.loads((ROOT / "data/reference/sk01/tests.json").read_text(encoding="utf-8"))
     rows = []
@@ -75,8 +79,27 @@ def main() -> int:
             r[k].replace("|", "/").replace("\n", " ") for k in ("id", "input", "expected", "actual", "status")
         ]
         lines.append("| " + " | ".join(cells) + " |")
+    llm_rows = [
+        (k, v) for k, v in sorted(results.items()) if k.endswith("-LLM")
+    ]  # см. tests/case_sk01/conftest.py
+    if llm_rows:
+        lines += [
+            "",
+            "## Прогон на реальной модели (`--llm`)",
+            "",
+            "Модель из `.env`. Результат недетерминирован: при повторном запуске задания будут другими.",
+            "",
+            "| ID | Фактический результат | Статус |",
+            "|---|---|---|",
+        ]
+        for k, v in llm_rows:
+            actual = " | ".join(a for a in v.get("actual", []) if a) or "—"
+            status = STATUS.get(v.get("status", ""), v.get("status", ""))
+            lines.append(f"| {k} | {actual.replace('|', '/').replace(chr(10), ' ')} | {status} |")
     (ROOT / "reports/case_tests.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"\n{passed}/{len(rows)} → reports/case_tests.md")
+    llm_ok = sum(v.get("status") == "passed" for _, v in llm_rows)
+    tail = f"; на модели: {llm_ok}/{len(llm_rows)}" if llm_rows else ""
+    print(f"\n{passed}/{len(rows)}{tail} → reports/case_tests.md")
     return code
 
 

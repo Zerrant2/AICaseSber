@@ -77,6 +77,7 @@ from .validators import (
     check_uud,
     fix_numeral_agreement,
 )
+from .wish import OperationWish, check_operations, parse_operation_wish
 
 logger = logging.getLogger(__name__)
 
@@ -203,16 +204,43 @@ class LLMWorkGenerator:
             new = self._renumber(old, mapping, ctx)
         else:
             await _say(progress, f"Составляю новое задание {task_number}…")
+            ops = parse_operation_wish(wish)
+            kind = old.kind
+            if len(ops.required) >= 2 and kind in (TaskKind.WORD_PROBLEM, TaskKind.COMPUTE):
+                kind = TaskKind.MULTI_STEP  # два разных действия — это составная задача
             slot = Slot(
-                number=task_number, kind=old.kind, target=_primary_group(old), trigger_hint=_hint_for(old)
+                number=task_number, kind=kind, target=_primary_group(old), trigger_hint=_hint_for(old)
             )
-            new, errs = await self._single_task(ctx, level, slot, avoid=[old.student_text], wish=wish)
-            if errs:
+            new, errs = await self._single_task(
+                ctx,
+                level,
+                slot,
+                avoid=[old.student_text],
+                wish=wish,
+                ops=ops,
+                repairs=self.settings.llm_max_repairs,
+            )
+            op_errs = check_operations(new, ops)
+            if op_errs:
+                new.checks.notes.append("Пожелание учителя выполнено не полностью.")
                 work.warnings.append(
                     GuardrailIssue(
                         code=GuardrailCode.OK,
                         severity=Severity.WARN,
-                        message_ru=f"Задание {new.task_id}: " + "; ".join(errs[:3]),
+                        message_ru=(
+                            f"Задание {new.task_id}: пожелание «{wish}» выполнить не удалось — "
+                            f"{ops.describe_ru()}, а модель составила задачу с другими действиями. "
+                            "Попробуйте сформулировать пожелание иначе или замените задание ещё раз."
+                        ),
+                    )
+                )
+            other = [e for e in errs if e not in op_errs]
+            if other:
+                work.warnings.append(
+                    GuardrailIssue(
+                        code=GuardrailCode.OK,
+                        severity=Severity.WARN,
+                        message_ru=f"Задание {new.task_id}: " + "; ".join(other[:3]),
                     )
                 )
         variant.tasks[task_number - 1] = new
@@ -303,6 +331,33 @@ class LLMWorkGenerator:
                     drafts[d.number - 1] = d
             tasks, errors = self._build_and_check(ctx, level, slots, drafts)
 
+        if errors:
+            # Починка не помогла — составляем такие задания заново (один раз, параллельно).
+            await _say(
+                progress,
+                f"Составляю заново задания {', '.join(map(str, sorted(errors)))} "
+                f"({LABELS_RU[level.value].lower()})…",
+            )
+            numbers = sorted(errors)
+            fresh = await asyncio.gather(
+                *(
+                    self._single_task(ctx, level, slots[n - 1], avoid=[tasks[n - 1].student_text])
+                    for n in numbers
+                ),
+                return_exceptions=True,
+            )
+            for n, res in zip(numbers, fresh, strict=True):
+                if isinstance(res, Exception):
+                    logger.warning("fresh retry for task %s failed: %r", n, res)
+                    continue
+                new_task, new_errs = res
+                if len(new_errs) < len(errors[n]):
+                    tasks[n - 1] = new_task
+                    if new_errs:
+                        errors[n] = new_errs
+                    else:
+                        del errors[n]
+
         warnings = []
         for n, errs in sorted(errors.items()):
             tasks[n - 1].checks.notes.extend(errs)
@@ -337,7 +392,13 @@ class LLMWorkGenerator:
         return variant, draft.title.strip(), warnings
 
     async def _ask_variant(
-        self, ctx: _Ctx, level: Level, slots: list[Slot], avoid=None, wish=None
+        self,
+        ctx: _Ctx,
+        level: Level,
+        slots: list[Slot],
+        avoid=None,
+        wish=None,
+        ops: OperationWish | None = None,
     ) -> VariantDraft:
         req = ctx.req
         user = render(
@@ -349,6 +410,7 @@ class LLMWorkGenerator:
             grade=req.grade,
             subject_name=req.subject_name,
             teacher_note=wish or req.teacher_note,
+            required_ops=ops.describe_ru() if ops else "",
             avoid=avoid or [],
         )
         schema = compact_schema(VariantDraft)
@@ -389,7 +451,16 @@ class LLMWorkGenerator:
                 continue
         return out
 
-    async def _single_task(self, ctx: _Ctx, level: Level, slot: Slot, avoid=None, wish=None):
+    async def _single_task(
+        self,
+        ctx: _Ctx,
+        level: Level,
+        slot: Slot,
+        avoid=None,
+        wish=None,
+        ops: OperationWish | None = None,
+        repairs: int = 1,
+    ):
         one = Slot(
             number=1,
             kind=slot.kind,
@@ -397,17 +468,27 @@ class LLMWorkGenerator:
             trigger_hint=slot.trigger_hint,
             extra_groups=slot.extra_groups,
         )
-        draft = await self._ask_variant(ctx, level, [one], avoid=avoid, wish=wish)
+        ops = ops or OperationWish()
+        draft = await self._ask_variant(ctx, level, [one], avoid=avoid, wish=wish, ops=ops)
         if not draft.tasks:
             raise GenerationError("Модель не вернула задание.")
         d = draft.tasks[0].model_copy(update={"number": slot.number})
-        tasks, errors = self._build_and_check(ctx, level, [slot], [d])
-        if errors:
-            fixed = await self._repair(ctx, [d], [e for es in errors.values() for e in es])
-            if fixed:
-                d = fixed[0].model_copy(update={"number": slot.number})
-                tasks, errors = self._build_and_check(ctx, level, [slot], [d])
-        return tasks[0], [e for es in errors.values() for e in es]
+
+        def run(dr):
+            tasks, errors = self._build_and_check(ctx, level, [slot], [dr])
+            errs = [e for es in errors.values() for e in es] + check_operations(tasks[0], ops)
+            return tasks[0], errs
+
+        task, errs = run(d)
+        for _ in range(max(1, repairs)):
+            if not errs:
+                break
+            fixed = await self._repair(ctx, [d], errs)
+            if not fixed:
+                break
+            d = fixed[0].model_copy(update={"number": slot.number})
+            task, errs = run(d)
+        return task, errs
 
     # ================================================================== build + checks
 

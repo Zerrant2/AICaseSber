@@ -73,3 +73,19 @@ async def test_fallbacks_system_and_json_mode():
     assert calls[-1]["response_format"]["type"] == "json_object"
     assert calls[-1]["messages"][0]["role"] == "user" and "sys" in calls[-1]["messages"][0]["content"]
     assert r.usage.cost_usd == round(100 / 1e6 * 1 + 50 / 1e6 * 2, 6)
+
+
+async def test_reasoning_setting_openrouter():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(json.loads(req.content))
+        return _ok('{"x": 1}')
+
+    await make_client(handler).complete("s", "u", json_schema={"type": "object"})
+    await make_client(handler, llm_reasoning="off").complete("s", "u", json_schema={"type": "object"})
+    await make_client(handler, llm_reasoning="low").complete("s", "u", json_schema={"type": "object"})
+    assert "reasoning" not in seen[0]
+    assert seen[1]["reasoning"] == {"enabled": False}
+    assert seen[2]["reasoning"] == {"effort": "low"}
+    assert Settings(_env_file=None, llm_reasoning="").llm_reasoning is None

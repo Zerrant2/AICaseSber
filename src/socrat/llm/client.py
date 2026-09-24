@@ -186,7 +186,13 @@ class OpenAICompatibleClient:
         elif mode == "prompt":
             user = user + "\n\nJSON-схема ответа:\n" + schema_hint(schema) + JSON_ONLY_INSTRUCTION
         if self._is_openrouter:
-            kwargs["extra_body"] = {"usage": {"include": True}}
+            extra: dict[str, Any] = {"usage": {"include": True}}
+            effort = (self.settings.llm_reasoning or "").strip().lower()
+            if effort in {"off", "none", "false", "0"}:
+                extra["reasoning"] = {"enabled": False}
+            elif effort in {"low", "medium", "high"}:
+                extra["reasoning"] = {"effort": effort}
+            kwargs["extra_body"] = extra
         kwargs["messages"] = self._messages(system, user)
 
         async for attempt in AsyncRetrying(
@@ -231,9 +237,26 @@ class OpenAICompatibleClient:
                 cost = None
         if cost is None:
             cost = self.estimate_cost(tin, tout)
+        details = getattr(u, "completion_tokens_details", None)
+        reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
+        finish = getattr(choice, "finish_reason", None) if choice else None
+        logger.info(
+            "LLM %s: in=%s out=%s reasoning=%s finish=%s cost=%s",
+            self.model,
+            tin,
+            tout,
+            reasoning,
+            finish,
+            cost,
+        )
         data = extract_json(text) if want_json else None
         if want_json and data is None:
-            logger.warning("LLM returned non-JSON answer (%d chars)", len(text))
+            logger.warning(
+                "LLM returned non-JSON answer (%d chars, finish=%s%s)",
+                len(text),
+                finish,
+                " — ответ обрезан, увеличьте LLM_MAX_TOKENS" if finish == "length" else "",
+            )
         return LLMResponse(
             text=text,
             data=data,

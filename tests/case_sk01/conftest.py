@@ -20,11 +20,21 @@ ROOT = Path(__file__).resolve().parents[2]
 REF = ROOT / "data" / "reference" / "sk01"
 REPORT = ROOT / "reports" / "case_tests.json"
 _RESULTS: dict[str, dict] = {}
+LLM_SUFFIX = "-LLM"  # прогон на реальной модели — отдельная строка отчёта, не смешивается с офлайн-проверкой
+
+
+def _failure_text(rep) -> str:
+    crash = getattr(getattr(rep, "longrepr", None), "reprcrash", None)
+    text = crash.message if crash is not None else str(rep.longrepr)
+    return " ".join(text.split())[:600]
 
 
 @pytest.fixture
 def record(request):
+    suffix = LLM_SUFFIX if request.node.get_closest_marker("llm") else ""
+
     def _rec(test_id: str, actual: str) -> None:
+        test_id += suffix
         _RESULTS.setdefault(test_id, {"actual": [], "nodeid": request.node.nodeid})
         _RESULTS[test_id]["actual"].append(actual)
 
@@ -40,9 +50,11 @@ def pytest_runtest_makereport(item, call):
             if r["nodeid"] == item.nodeid:
                 r["status"] = "xfail" if hasattr(rep, "wasxfail") else rep.outcome
         tid = item.name.split("_")[1] if item.name.startswith("test_T") else None
+        if tid and item.get_closest_marker("llm"):
+            tid += LLM_SUFFIX
         if tid and tid not in _RESULTS:
             _RESULTS[tid] = {
-                "actual": [str(rep.longrepr)[:300] if rep.failed else ""],
+                "actual": [_failure_text(rep) if rep.failed else ""],
                 "nodeid": item.nodeid,
                 "status": "xfail" if hasattr(rep, "wasxfail") else rep.outcome,
             }
