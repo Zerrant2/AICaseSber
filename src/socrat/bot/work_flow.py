@@ -32,6 +32,7 @@ from socrat.contracts import (
     UsageRecord,
     UUDFocus,
 )
+from socrat.core.specs import estimate_work_minutes
 from socrat.storage.security import keyed_lookup, secret_bytes
 
 from . import texts
@@ -137,13 +138,20 @@ async def show_uud(target: Message | CallbackQuery, state: FSMContext) -> None:
 
 
 async def show_count(target: Message | CallbackQuery, state: FSMContext, settings: Settings) -> None:
+    data = await state.get_data()
+    levels = LevelChoice(data["level"]).levels()
+    focus = UUDFocus(data["uud_focus"])
+
+    def label(count: int) -> str:
+        minutes = max(
+            estimate_work_minutes(level, count, focus, data["subject_id"], data["grade"]) for level in levels
+        )
+        return f"{count} · {minutes:g} мин"
+
     await state.set_state(WorkFlow.count)
     maximum = min(8, settings.max_tasks)
     rows = [
-        [
-            (f"{count} · {4 + count * 3.5:g} мин", f"cw:n:{count}")
-            for count in range(first, min(first + 2, maximum + 1))
-        ]
+        [(label(count), f"cw:n:{count}") for count in range(first, min(first + 2, maximum + 1))]
         for first in range(1, maximum + 1, 2)
     ]
     rows.append([(texts.WORK_BACK, "cw:back")])
