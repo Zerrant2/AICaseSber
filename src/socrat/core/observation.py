@@ -20,7 +20,7 @@ from socrat.contracts import (
     UUDObservationItem,
 )
 
-from .mathcheck import fmt, numbers_in, parse_number
+from .mathcheck import answer_value, fmt, numbers_in, parse_number
 
 EXPLAIN = ("потому", "так как", "т.к", "значит", "поэтому", "чтобы", "ведь", "нужно", "надо", "получается")
 CHECK = ("провер", "обратн", "сверил", "сверяю", "проверка")
@@ -63,7 +63,7 @@ class RuleResponseObserver:
         text = (response_text or "").strip()
         low = text.lower().replace("ё", "е")
         nums = numbers_in(text)
-        expected = parse_number(task.expected_answer)
+        expected = answer_value(task.expected_answer)
 
         # ---- предметная часть
         answer_m = re.search(r"ответ\s*[:\-—]?\s*(-?\d+(?:[.,]\d+)?)", low)

@@ -133,3 +133,20 @@ def replace_numbers(text: str, mapping: dict[int, int]) -> str:
         return str(mapping.get(v, v))
 
     return re.sub(r"(?<![\d.,])\d+(?![\d.,]\d)", sub, text)
+
+
+def answer_value(text: str | None) -> Fraction | None:
+    """Итоговое число из ответа, даже если модель написала его фразой.
+
+    «Ответ: 57 фломастеров» → 57; «Сначала 4 · 9 = 36, потом 36 − 12 = 24. Осталось 24 тетради» → 24;
+    «Ошибка: сложил 6 и 5. Верно: 6 · 5 = 30 карандашей» → 30; «12» → 12. Часть после «проверка» игнорируется.
+    """
+    if not text:
+        return None
+    low = text.lower()
+    m = re.findall(r"ответ\s*[:\-—]?\s*(-?\d[\d\s]*(?:[.,]\d+)?)", low)
+    if m:
+        return parse_number(m[-1])
+    main = re.split(r"провер", low, maxsplit=1)[0]
+    nums = numbers_in(main) or numbers_in(low)
+    return nums[-1] if nums else None
