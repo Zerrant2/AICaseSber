@@ -125,8 +125,8 @@ async def test_guardrails_codes(core_factory):
     assert any(i.code == GuardrailCode.FULL_FGOS_GUARANTEE for i in r.issues)
     r = await gen.check_request(req(subject_id="chemistry", subject_name="Химия"))
     assert r.blocked and r.issues[0].code == GuardrailCode.SUBJECT_UNKNOWN
-    r = await gen.check_request(req(topic="Умножение для Пети Иванова"))
-    assert any(i.code == GuardrailCode.PERSONAL_DATA for i in r.issues)
+    r = await gen.check_request(req(topic="Законы Ньютона и умножение"))
+    assert not any(i.code == GuardrailCode.PERSONAL_DATA for i in r.issues)  # автозамены имён нет
     r = await gen.check_request(req())
     assert not r.blocked and all(i.severity != Severity.BLOCK for i in r.issues)
 
