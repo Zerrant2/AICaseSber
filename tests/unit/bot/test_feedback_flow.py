@@ -28,7 +28,7 @@ from socrat.contracts import (
     SessionInfo,
     Severity,
 )
-from socrat.core import build_core
+from socrat.core import RuleResponseObserver, build_core
 from socrat.testing.scripted import ScriptedLLM
 
 FIXTURE = Path(__file__).resolve().parents[3] / "data/fixtures/work_math3_all.json"
@@ -146,6 +146,16 @@ async def test_response_and_reflection_are_observed_without_storing_text(setting
         assert (await services.usage.summary(30)).by_kind["observation"] == 2
     finally:
         await close_services(services)
+
+
+def test_teacher_question_is_directed_without_uud_lines() -> None:
+    task = fixture_work().find_task("A-1")
+    result = RuleResponseObserver().observe(task, "Ученик не справился с умножением, как ему помочь")
+
+    assert result.uud == []
+    lines = feedback_flow._observation_lines(result)
+    assert "Анализ типичной ошибки" in lines[0]
+    assert not any("УУД" in line for line in lines)
 
 
 async def test_regeneration_sends_revised_documents(settings, monkeypatch: pytest.MonkeyPatch) -> None:
