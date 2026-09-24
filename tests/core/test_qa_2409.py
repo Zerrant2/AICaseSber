@@ -153,3 +153,62 @@ async def test_fresh_retry_after_failed_repairs(core_factory):
     assert t3.task_id == "B-3" and t3.checks.math_verified is True
     assert not [w for w in work.warnings if "B-3" in w.message_ru]
     assert any("ровно 1 задани" in c["user"] for c in llm.calls)
+
+
+# ------------------------------------------------------------------ подсказки модели не видны педагогу (24.09, 21:00)
+
+SERVICE = ("student_text", "trigger", "uud", "cognitive", "regulatory", "communicative", "добавь", "укажи")
+
+
+def test_for_teacher_hides_model_instructions():
+    from socrat.core.validators import for_teacher
+
+    msg = for_teacher(
+        "Задание 3: не видно действия группы «cognitive». Добавь в student_text явное требование вроде "
+        "«Сравни» и укажи в uud trigger — дословную цитату."
+    )
+    assert "познавательное" in msg and "«Сравни»" in msg
+    assert not any(w in msg.lower() for w in SERVICE)
+    assert for_teacher(
+        "Задание 4: недопустимая формулировка «неспособн» (диагноз/оценка личности) — убери."
+    ) == ("в тексте есть оценочное слово («неспособн…») — замените нейтральным")
+
+
+async def test_service_words_in_student_text_are_repaired_and_hidden(core_factory):
+    """Модель (gemma) перенесла в текст задания слова из инструкции; ошибка не должна дойти до педагога в сыром виде."""
+
+    class NoRepair(ScriptedLLM):
+        async def complete(self, system, user, **kw):
+            if user.startswith("Автоматическая проверка нашла ошибки") or "ровно 1 задани" in user:
+                self.calls.append({"system": system, "user": user})
+                from socrat.contracts import LLMResponse, LLMUsage
+
+                data = (
+                    copy.deepcopy(bad) if "ровно 1" in user else {"tasks": [copy.deepcopy(bad["tasks"][0])]}
+                )
+                if "ровно 1" in user:
+                    data["tasks"] = data["tasks"][:1]
+                return LLMResponse(text="{}", data=data, usage=LLMUsage(model="s", tokens_in=1, tokens_out=1))
+            return await super().complete(system, user, **kw)
+
+    bad = copy.deepcopy(variant_draft("basic", 4, 6, 5))
+    bad["tasks"][0]["student_text"] += " (trigger: cognitive)"
+    llm = NoRepair(broken={"basic": bad})
+    gen, _, _ = core_factory(llm)
+    work = await gen.generate(_req())
+    t1 = work.variants[0].tasks[0]
+    shown = " ".join([w.message_ru for w in work.warnings] + t1.checks.notes).lower()
+    assert "служебные слова" in shown
+    assert not any(w in shown for w in ("student_text", "добавь", "укажи", "перепиши"))
+    assert any("служебные слова" in c["user"] for c in llm.calls)  # модели ошибка ушла в полном виде
+
+
+def test_caution_against_labels_is_not_a_label():
+    from socrat.contracts import DiagnosticWork
+    from socrat.core.validators import check_language
+
+    t = DiagnosticWork.model_validate_json(open(FIX, encoding="utf-8").read()).find_task("A-1")
+    t.conducting_note = "Ошибка не значит, что ребёнок неспособный к математике."
+    assert check_language(t) == []
+    t.conducting_note = "Неспособным к математике детям дайте опору."
+    assert check_language(t)

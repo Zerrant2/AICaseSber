@@ -10,7 +10,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-PROMPT_VERSION = "1.2"
+PROMPT_VERSION = "1.3"
 _DIR = Path(__file__).resolve().parent
 
 

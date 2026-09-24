@@ -76,6 +76,7 @@ from .validators import (
     check_math,
     check_uud,
     fix_numeral_agreement,
+    for_teacher,
 )
 from .wish import OperationWish, check_operations, parse_operation_wish
 
@@ -240,7 +241,9 @@ class LLMWorkGenerator:
                     GuardrailIssue(
                         code=GuardrailCode.OK,
                         severity=Severity.WARN,
-                        message_ru=f"Задание {new.task_id}: " + "; ".join(other[:3]),
+                        message_ru=f"Задание {new.task_id} не прошло автопроверку — просмотрите его: "
+                        + "; ".join(list(dict.fromkeys(for_teacher(e) for e in other))[:3])
+                        + ".",
                     )
                 )
         variant.tasks[task_number - 1] = new
@@ -355,13 +358,14 @@ class LLMWorkGenerator:
 
         warnings = []
         for n, errs in sorted(errors.items()):
-            tasks[n - 1].checks.notes.extend(errs)
+            tasks[n - 1].checks.notes.extend(dict.fromkeys(for_teacher(e) for e in errs))
             warnings.append(
                 GuardrailIssue(
                     code=GuardrailCode.OK,
                     severity=Severity.WARN,
                     message_ru=f"Задание {tasks[n - 1].task_id} не прошло автопроверку — просмотрите его: "
-                    + "; ".join(errs[:2]),
+                    + "; ".join(list(dict.fromkeys(for_teacher(e) for e in errs))[:2])
+                    + ".",
                 )
             )
         questions = [q for q in draft.reflection_questions if q.strip()][:4] or DEFAULT_REFLECTION
