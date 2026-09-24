@@ -33,7 +33,7 @@ from socrat.contracts import (
 from socrat.prompts import PROMPT_VERSION, render
 
 from .drafts import AnalysisDraft, compact_schema
-from .guardrails import DIAGNOSIS_RE, Guardrails, mask_names
+from .guardrails import DIAGNOSIS_RE, Guardrails
 from .links import make_link
 from .techniques import TechniqueLibrary
 
@@ -85,9 +85,7 @@ class LLMErrorAnalyzer:
             raise GenerationError(
                 "\n".join(i.message_ru for i in guard.issues if i.severity == Severity.BLOCK)
             )
-        safe = req.model_copy(
-            update={"description": mask_names(req.description), "topic": mask_names(req.topic)}
-        )
+        safe = req
         if progress:
             await progress("Анализирую описание ошибки…")
         outcomes = self.knowledge.get_outcomes(

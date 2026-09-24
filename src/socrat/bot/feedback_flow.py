@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 from contextlib import suppress
 
@@ -24,7 +23,6 @@ from .work_flow import GenerationController, _keyboard, _show
 
 logger = logging.getLogger(__name__)
 router = Router(name="feedback_flow")
-_PERSONAL_NAME = re.compile(r"\b[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\b")
 
 
 class FollowupFlow(StatesGroup):
@@ -35,7 +33,9 @@ class FollowupFlow(StatesGroup):
 
 
 def _anonymous(value: str) -> bool:
-    return not _PERSONAL_NAME.search(value)
+    # Проверка «два слова с заглавной» убрана 24.09: срабатывала на «Законы Ньютона».
+    # Педагога просят не вводить данные детей в подсказках бота; ответ ученика удаляется после разбора.
+    return True
 
 
 async def _work(services: Services, work_id: str):

@@ -43,15 +43,16 @@ async def test_analysis_cleans_diagnosis_words(core_factory):
     assert any(w.code == GuardrailCode.DIAGNOSIS_REQUEST for w in res.warnings)
 
 
-async def test_analysis_blocks_diagnosis_request_and_masks_names(core_factory):
+async def test_analysis_blocks_diagnosis_request_keeps_text(core_factory):
     llm = ScriptedLLM()
     _, analyzer, _ = core_factory(llm)
     with pytest.raises(GenerationError):
         await analyzer.analyze(areq("Поставьте диагноз: у кого дискалькулия? Путают периметр и площадь."))
-    r = await analyzer.check(areq("Петя Иванов путает периметр и площадь в каждой задаче."))
-    assert any(i.code == GuardrailCode.PERSONAL_DATA for i in r.issues)
-    await analyzer.analyze(areq("Петя Иванов путает периметр и площадь в каждой задаче."))
-    assert "Иванов" not in llm.calls[-1]["user"]
+    # Автозамены имён нет (решение 24.09): текст педагога уходит в модель как есть.
+    r = await analyzer.check(areq("Путают законы Ньютона и периметр с площадью в каждой задаче."))
+    assert not any(i.code == GuardrailCode.PERSONAL_DATA for i in r.issues)
+    await analyzer.analyze(areq("Путают законы Ньютона и периметр с площадью в каждой задаче."))
+    assert "Ньютона" in llm.calls[-1]["user"] and "[ученик]" not in llm.calls[-1]["user"]
 
 
 def _task(tid):

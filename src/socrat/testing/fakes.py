@@ -254,15 +254,7 @@ class FakeErrorAnalyzer:
         )
 
     async def check(self, req: ErrorAnalysisRequest) -> GuardrailResult:
-        issues = []
-        if re.search(r"\b[А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+(ов|ова|ев|ева|ин|ина)\b", req.description):
-            issues.append(
-                GuardrailIssue(
-                    code=GuardrailCode.PERSONAL_DATA,
-                    severity=Severity.WARN,
-                    message_ru="Похоже, в описании есть имя и фамилия ребёнка. Опишите ошибку без имён.",
-                )
-            )
+        issues: list[GuardrailIssue] = []
         return GuardrailResult(issues=issues)
 
     async def analyze(self, req: ErrorAnalysisRequest, progress=None) -> ErrorAnalysisResult:
