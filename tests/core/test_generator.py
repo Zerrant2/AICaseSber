@@ -129,3 +129,16 @@ async def test_guardrails_codes(core_factory):
     assert any(i.code == GuardrailCode.PERSONAL_DATA for i in r.issues)
     r = await gen.check_request(req())
     assert not r.blocked and all(i.severity != Severity.BLOCK for i in r.issues)
+
+
+async def test_sentence_answers_and_title_from_real_run(core_factory):
+    """Регрессия по первому прогону на DeepSeek (24.09): ответы фразами и уровень в заголовке."""
+    bad = copy.deepcopy(variant_draft("basic", 4, 6, 5))
+    bad["title"] = "Умножение и деление. Сложный вариант"
+    bad["tasks"][2]["expected_answer"] = "Ошибка: сложил 4 и 6 вместо умножения. Верно: 4 · 6 = 24 карточки."
+    bad["tasks"][3]["expected_answer"] = "Сначала 4 · 6 = 24, потом 24 − 5 = 19. Осталось 19 карточек."
+    gen, _, _ = core_factory(ScriptedLLM(broken={"basic": bad}))
+    work = await gen.generate(req(level=LevelChoice.BASIC))
+    assert "Сложный" not in work.title and "вариант" not in work.title.lower()
+    assert not [w for w in work.warnings if "не прошло автопроверку" in w.message_ru]
+    assert work.meta.repairs == 0

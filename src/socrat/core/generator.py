@@ -55,7 +55,7 @@ from socrat.prompts import PROMPT_VERSION, render
 from .drafts import TaskDraft, VariantDraft, compact_schema
 from .guardrails import Guardrails, mask_names
 from .links import make_link
-from .mathcheck import evaluate, fmt, parse_number, parse_number_mapping, replace_numbers
+from .mathcheck import answer_value, evaluate, fmt, parse_number, parse_number_mapping, replace_numbers
 from .specs import (
     DEFAULT_REFLECTION,
     KINDS,
@@ -173,7 +173,7 @@ class LLMWorkGenerator:
                 ) from res
             variant, draft_title, var_warnings = res
             variants.append(variant)
-            title = draft_title or title
+            _ = draft_title  # название работы берём из темы учителя: заголовок модели мог содержать уровень
             warnings.extend(var_warnings)
 
         await _say(progress, "Проверяю уровни и покрытие УУД…")
@@ -477,7 +477,11 @@ class LLMWorkGenerator:
             meta_goal=d.meta_goal,
             expected_answer=d.expected_answer.strip(),
             solution_steps=[
-                SolutionStep(text=s.text, expression=s.expression or None, result=s.result)
+                SolutionStep(
+                    text=_step_text(s.text, s.expression, s.result),
+                    expression=s.expression or None,
+                    result=s.result,
+                )
                 for s in d.solution_steps
             ],
             alternative_solutions=d.alternative_solutions,
@@ -541,7 +545,7 @@ class LLMWorkGenerator:
         t.support = fix_numeral_agreement(replace_numbers(t.support, mapping)) if t.support else None
         # операнды: результаты прежних шагов → новые значения; остальные числа — по словарю учителя
         results_map: dict[str, str] = {}
-        old_expected = parse_number(old.expected_answer)
+        old_expected = answer_value(old.expected_answer)
         last = None
         new_expected = None
         for s in t.solution_steps:
@@ -566,9 +570,15 @@ class LLMWorkGenerator:
             s.text = f"{expr.replace('*', ' × ').replace('/', ' : ')} = {fmt(val)}"
             s.expression, s.result, s.verified = expr, fmt(val), None
             last = val
-        target = new_expected if new_expected is not None else last
-        if target is not None and old_expected is not None:
-            t.expected_answer = re.sub(r"-?\d+(?:[.,]\d+)?", fmt(target), t.expected_answer, count=1)
+
+        def sub_answer(m: re.Match) -> str:
+            tok = m.group(0)
+            if tok in results_map:
+                return results_map[tok]
+            return str(mapping.get(int(tok), tok)) if tok.isdigit() else tok
+
+        t.expected_answer = re.sub(r"(?<![\d.])\d+(?:\.\d+)?(?![\d.])", sub_answer, t.expected_answer)
+        _ = (new_expected, last)
         t.checks = TaskChecks(
             notes=[
                 f"Числа изменены по запросу учителя ({', '.join(f'{a}→{b}' for a, b in mapping.items())}); решение пересчитано кодом."
@@ -687,6 +697,18 @@ async def _say(progress: ProgressCallback | None, text: str) -> None:
         await progress(text)
     except Exception:  # прогресс не должен ломать генерацию
         logger.debug("progress callback failed", exc_info=True)
+
+
+def _step_text(text: str, expression: str | None, result: str | None) -> str:
+    """Если модель описала шаг словами без вычисления — дописываем «(6 · 4 = 24)», чтобы учитель видел расчёт."""
+    text = (text or "").strip()
+    if not expression:
+        return text
+    pretty = expression.replace("*", " · ").replace("/", " : ").replace("-", " − ").replace("+", " + ")
+    pretty = re.sub(r"\s+", " ", pretty).strip()
+    shown = f"{pretty} = {result}" if result else pretty
+    has_calc = bool(re.search(r"\d\s*[·×x*:/+\-−]\s*\d", text))
+    return text if has_calc else f"{text} ({shown})".strip()
 
 
 def _primary_group(task: Task) -> UUDGroup:

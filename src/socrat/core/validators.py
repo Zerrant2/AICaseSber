@@ -14,7 +14,7 @@ from functools import lru_cache
 
 from socrat.contracts import Level, Task, TaskKind, UUDGroup, Variant
 
-from .mathcheck import MathError, evaluate, fmt, numbers_in, operands, parse_number
+from .mathcheck import MathError, answer_value, evaluate, fmt, numbers_in, operands, parse_number
 from .specs import KINDS, UUD_TRIGGER_WORDS, Slot
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ def check_math(task: Task, *, is_math: bool, limit: int | None, primary: bool) -
     if not is_math:
         task.checks.math_verified = None
         return errors
-    expected = parse_number(task.expected_answer)
+    expected = answer_value(task.expected_answer)
     numeric_expected = expected is not None and task.kind not in NON_NUMERIC_KINDS
     if numeric_expected and not steps_with_expr:
         errors.append(
@@ -154,7 +154,7 @@ def check_leak(task: Task) -> list[str]:
     errors: list[str] = []
     visible = student_fields(task)
     vis_norm = re.sub(r"\s+", "", visible).replace("×", "*").replace("·", "*").replace(":", "/")
-    expected = parse_number(task.expected_answer)
+    expected = answer_value(task.expected_answer)
     if expected is not None and task.kind != TaskKind.FIND_ERROR:
         e = re.escape(fmt(expected))
         if re.search(rf"=\s*{e}(?![\d,.])", visible) or re.search(
