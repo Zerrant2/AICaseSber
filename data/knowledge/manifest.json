@@ -1,0 +1,97 @@
+{
+  "updated_at": "2026-09-24T09:57:21.655812+00:00",
+  "documents": {
+    "FRP-MATH-2025": {
+      "source_id": "FRP-MATH-2025",
+      "title": "Федеральная рабочая программа «Математика» 1–4 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "noo"
+      ],
+      "subject_id": "math",
+      "grades": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "is_normative": true,
+      "sha256": "229575e2a76a14850f45be0d59bdc7a69128abc54f1d798f1b3416acae7ed785",
+      "bytes": 849633,
+      "pages": 79,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-MATH-2025.pdf",
+      "note": "Источник справочника кейса SK01 (стр. 18–20, 23 по нумерации PDF)"
+    },
+    "FRP-RUSSIAN-NOO-2025": {
+      "source_id": "FRP-RUSSIAN-NOO-2025",
+      "title": "Федеральная рабочая программа «Русский язык» 1–4 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_russkij-yazyk_1-4.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "noo"
+      ],
+      "subject_id": "russian",
+      "grades": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "is_normative": true,
+      "sha256": "a890038ce4fcc825d4a7853eae42c0c6fc7ac7bc5af8fba61e0bad8e12ee3f82",
+      "bytes": 2064904,
+      "pages": 196,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-RUSSIAN-NOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-LITERARY-READING-NOO-2025": {
+      "source_id": "FRP-LITERARY-READING-NOO-2025",
+      "title": "Федеральная рабочая программа «Литературное чтение» 1–4 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_literaturnoe-chtenie_1-4.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "noo"
+      ],
+      "subject_id": "literary_reading",
+      "grades": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "is_normative": true,
+      "sha256": "b859421ba09d853cf651c6e91bc721345324b5bccb94bc2ce7d89f015f74bfed",
+      "bytes": 1972091,
+      "pages": 204,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-LITERARY-READING-NOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-WORLD-NOO-2025": {
+      "source_id": "FRP-WORLD-NOO-2025",
+      "title": "Федеральная рабочая программа «Окружающий мир» 1–4 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_okruzhayushhij-mir_1-4.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "noo"
+      ],
+      "subject_id": "world",
+      "grades": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "is_normative": true,
+      "sha256": "8ae0c48d3017b7ad0b0ce7a43341a3fa1a8a819557be72d5ab1ef7f937853541",
+      "bytes": 1292129,
+      "pages": 111,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-WORLD-NOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    }
+  }
+}
