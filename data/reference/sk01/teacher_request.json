@@ -1,0 +1,24 @@
+{
+  "subject": "Математика",
+  "grade": 3,
+  "topic": "Умножение и деление в пределах 100 и задачи в одно-два действия",
+  "when": "После изучения темы, не как обязательная входная работа в начале сентября",
+  "levels": [
+    "easy",
+    "basic",
+    "advanced"
+  ],
+  "presentation_modes": [
+    "text",
+    "visual",
+    "practical"
+  ],
+  "minutes_range": [
+    15,
+    20
+  ],
+  "tasks_per_variant": 4,
+  "reflection_required": true,
+  "personal_scoring": false,
+  "additional_school_data_required": false
+}

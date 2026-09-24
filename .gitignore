@@ -1,0 +1,29 @@
+# secrets
+.env
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# runtime data
+data/socrat.db*
+data/knowledge/raw/
+data/knowledge/index/
+data/uploads/
+reports/tmp/
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+~$*
