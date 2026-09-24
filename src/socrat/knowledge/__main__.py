@@ -73,7 +73,7 @@ async def main() -> None:
         pages_dir.mkdir(parents=True, exist_ok=True)
         for pdf in sorted(raw_dir.glob("*.pdf")):
             print(f"  -> Парсинг {pdf.name}...")
-            parse_and_save_pdf(pdf, pdf.stem, pages_dir)
+            parse_and_save_pdf(pdf, pdf.stem, pages_dir, sources_file=settings.sources_file)
 
         print("2. Нарезка на фрагменты (чанкинг)...")
         chunks_dir = settings.knowledge_dir / "chunks"

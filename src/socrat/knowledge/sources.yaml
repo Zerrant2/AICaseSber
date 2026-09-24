@@ -79,6 +79,7 @@ sources:
     edu_levels: [ooo]
     subject_id: math
     grades: [5, 6]
+    page_range: [1, 39]
     note: "Часть единой программы ООО Математика 5–9 (стр. 17–19)"
 
   - source_id: FRP-ALGEBRA-OOO-2025
@@ -88,6 +89,7 @@ sources:
     edu_levels: [ooo]
     subject_id: algebra
     grades: [7, 8, 9]
+    page_range: [40, 69]
     note: "Курс «Алгебра» единой программы ООО Математика 5–9 (стр. 44–48)"
 
   - source_id: FRP-GEOMETRY-OOO-2025
@@ -97,6 +99,7 @@ sources:
     edu_levels: [ooo]
     subject_id: geometry
     grades: [7, 8, 9]
+    page_range: [70, 90]
     note: "Курс «Геометрия» единой программы ООО Математика 5–9 (стр. 72–75)"
 
   - source_id: FRP-RUSSIAN-OOO-2025

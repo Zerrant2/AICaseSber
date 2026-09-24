@@ -194,6 +194,33 @@ def test_check_topic_g16_cross_grade_rejection(test_kb: LocalKnowledgeBase):
         assert res.in_program, f"Topic '{topic}' should be in program for algebra 7"
 
 
+def test_check_topic_g17_different_grade_topics(test_kb: LocalKnowledgeBase):
+    """Проверка G17: темы из программы предмета, но другого класса (алгебра 7/8, геометрия 7/9)."""
+    # 1. Темы соседних классов в 5-9 классах:
+    # «Квадратные уравнения» в 7 классе алгебры (по ФРП это 8 класс)
+    res_alg7 = test_kb.check_topic(7, "algebra", "Квадратные уравнения")
+    assert not res_alg7.in_program
+    assert res_alg7.confidence <= 0.5
+    assert "Тема есть в программе предмета, но в другом классе" in res_alg7.matched_topics
+    assert len(res_alg7.suggestions) > 0
+
+    # «Векторы» в 7 классе геометрии (по ФРП это 9 класс)
+    res_geom7 = test_kb.check_topic(7, "geometry", "Векторы")
+    assert not res_geom7.in_program
+    assert res_geom7.confidence <= 0.5
+    assert "Тема есть в программе предмета, но в другом классе" in res_geom7.matched_topics
+    assert len(res_geom7.suggestions) > 0
+
+    # 2. В своих классах те же темы должны быть in_program=True:
+    res_alg8 = test_kb.check_topic(8, "algebra", "Квадратные уравнения")
+    assert res_alg8.in_program
+    assert res_alg8.confidence >= 0.5
+
+    res_geom9 = test_kb.check_topic(9, "geometry", "Векторы")
+    assert res_geom9.in_program
+    assert res_geom9.confidence >= 0.5
+
+
 def test_check_topic_fallback_without_index_or_pages(tmp_path: Path):
     """Проверка работы check_topic на чистом клоне без index/ и pages/ (G10)."""
     real_settings = get_settings()

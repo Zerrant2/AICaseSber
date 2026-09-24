@@ -465,18 +465,9 @@ class LocalKnowledgeBase:
             # Фильтруем результаты: тема должна покрывать >= 60% значимых слов (G16)
             hits = [h for h in raw_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
 
-        best_score = hits[0].score if hits else 0.0
-        in_prog = best_score >= 0.4
-
-        matched_topics: list[str] = []
-        for h in hits:
-            if h.score >= 0.4:
-                first_line = h.chunk.text.split("\n")[0].strip()
-                matched_topics.append(first_line[:80])
-
-        # 2. Если по разделу содержания ничего не нашлось (или индекс пуст),
-        # ищем по формулировкам результатов каталога этого класса и предмета (G14)
-        if not in_prog and target_outcomes:
+        # 2. Поиск по формулировкам результатов каталога этого класса и предмета (G14, G17)
+        outcome_hits: list[SearchHit] = []
+        if target_outcomes:
             temp_chunks = [
                 Chunk(
                     chunk_id=o.outcome_id,
@@ -498,15 +489,46 @@ class LocalKnowledgeBase:
                 k=5,
             )
             outcome_hits = [h for h in raw_outcome_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
+
+        # Проверяем, есть ли тема в результатах этого класса из каталога (G17)
+        in_this_grade_outcome = any(topic_coverage(topic, o.text) >= 0.60 for o in target_outcomes) or any(
+            h.score >= 0.4 for h in outcome_hits
+        )
+
+        # Проверяем, есть ли тема в результатах других классов этого же предмета (G17)
+        other_grade_outcomes = [
+            o
+            for o in self._outcomes
+            if o.subject_id == subject_id and o.grade is not None and o.grade != grade
+        ]
+        in_other_grade_outcome = any(topic_coverage(topic, o.text) >= 0.60 for o in other_grade_outcomes)
+
+        has_explicit_grade_chunk = any(h.chunk.grade == grade and h.score >= 0.4 for h in hits)
+
+        in_this_grade = in_this_grade_outcome or (has_explicit_grade_chunk and not in_other_grade_outcome)
+
+        matched_topics: list[str] = []
+        best_score = hits[0].score if hits else 0.0
+
+        if in_this_grade:
+            in_prog = True
             outcome_best_score = outcome_hits[0].score if outcome_hits else 0.0
-            if outcome_best_score >= 0.4:
-                in_prog = True
-                best_score = max(best_score, outcome_best_score)
+            best_score = max(best_score, outcome_best_score)
+            if not hits and outcome_hits:
                 hits = outcome_hits
-                for h in outcome_hits:
-                    if h.score >= 0.4:
-                        first_line = h.chunk.text.split("\n")[0].strip()
-                        matched_topics.append(first_line[:80])
+            for h in hits:
+                if h.score >= 0.4:
+                    first_line = h.chunk.text.split("\n")[0].strip()
+                    matched_topics.append(first_line[:80])
+        else:
+            in_prog = False
+            has_general_chunk_hit = any(h.score >= 0.4 for h in hits)
+            if has_general_chunk_hit or in_other_grade_outcome:
+                matched_topics = ["Тема есть в программе предмета, но в другом классе"]
+                best_score = min(0.5, max(best_score, 0.4))
+            else:
+                matched_topics = []
+                best_score = 0.1
 
         # 3. Подсказки тем (до 5 коротких названий)
         suggestions: list[str] = []
@@ -574,7 +596,7 @@ class LocalKnowledgeBase:
 
         return TopicCheck(
             in_program=in_prog,
-            confidence=min(1.0, max(0.1, best_score)) if in_prog else 0.1,
+            confidence=min(1.0, max(0.1, best_score)),
             matched_topics=list(dict.fromkeys(matched_topics))[:3],
             suggestions=suggestions[:5],
             evidence=hits,
@@ -714,7 +736,7 @@ class LocalKnowledgeBase:
             sid = pdf_path.stem
             if progress:
                 await progress(f"Парсинг PDF {sid}…")
-            parse_and_save_pdf(pdf_path, sid, pages_dir)
+            parse_and_save_pdf(pdf_path, sid, pages_dir, sources_file=self.settings.sources_file)
 
         # 3. G4: Нарезка на фрагменты (чанкинг)
         chunks_dir = self.settings.knowledge_dir / "chunks"
