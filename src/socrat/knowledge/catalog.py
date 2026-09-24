@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from socrat.config import Settings
 from socrat.contracts import Outcome, OutcomeType
@@ -26,6 +27,76 @@ _REF_TYPE_MAP = {
     "коммуникативные УУД": OutcomeType.COMMUNICATIVE,
     "личностная направленность": OutcomeType.PERSONAL,
 }
+
+GRADE_WORDS: dict[str, int] = {
+    "1": 1,
+    "первом": 1,
+    "первый": 1,
+    "2": 2,
+    "втором": 2,
+    "второй": 2,
+    "3": 3,
+    "третьем": 3,
+    "третий": 3,
+    "4": 4,
+    "четвертом": 4,
+    "четвёртом": 4,
+    "четвертый": 4,
+    "четвёртый": 4,
+    "5": 5,
+    "пятом": 5,
+    "пятый": 5,
+    "6": 6,
+    "шестом": 6,
+    "шестой": 6,
+    "7": 7,
+    "седьмом": 7,
+    "седьмой": 7,
+    "8": 8,
+    "восьмом": 8,
+    "восьмой": 8,
+    "9": 9,
+    "девятом": 9,
+    "девятый": 9,
+    "10": 10,
+    "десятом": 10,
+    "десятый": 10,
+    "11": 11,
+    "одиннадцатом": 11,
+    "одиннадцатый": 11,
+}
+
+SUBHEAD_PREFIXES: tuple[str, ...] = (
+    "1)",
+    "2)",
+    "3)",
+    "4)",
+    "5)",
+    "6)",
+    "1.",
+    "2.",
+    "3.",
+    "4.",
+    "5.",
+    "6.",
+    "Базовые логические",
+    "Базовые исследовательские",
+    "Работа с информацией",
+    "Универсальные учебные познавательные",
+    "Универсальные учебные коммуникативные",
+    "Универсальные учебные регулятивные",
+    "Самоорганизация",
+    "Самоконтроль",
+    "Общение",
+    "Совместная деятельность",
+    "Гражданско-патриотического",
+    "Духовно-нравственного",
+    "Эстетического",
+    "Физического",
+    "Трудового",
+    "Экологического",
+    "Ценности научного",
+)
 
 
 def load_sk01_reference_outcomes(case_ref_dir: Path) -> list[Outcome]:
@@ -56,30 +127,60 @@ def load_sk01_reference_outcomes(case_ref_dir: Path) -> list[Outcome]:
     return outcomes
 
 
-def extract_math_outcomes_from_frp(
+def extract_outcomes_from_frp(
     source_id: str,
+    subject_id: str,
     doc_url: str,
-    total_pages: int,
     pages_dir: Path,
+    level: str = "noo",
 ) -> tuple[list[Outcome], list[Outcome]]:
-    """Извлекает предметные и метапредметные результаты из ФРП «Математика» 1–4 классы.
+    """Извлекает предметные и метапредметные результаты из ФРП предмета.
 
     Возвращает (subject_outcomes, meta_outcomes).
     """
-    subject_outcomes: list[Outcome] = []
-    meta_outcomes: list[Outcome] = []
+    p_file = pages_dir / f"{source_id}.jsonl"
+    if not p_file.exists():
+        logger.warning("Pages file not found: %s", p_file)
+        return [], []
 
-    # 1. Извлечение метапредметных и личностных результатов (стр. 18-20)
+    pages: list[dict[str, Any]] = []
+    with open(p_file, encoding="utf-8") as f:
+        for line in f:
+            line_str = line.strip()
+            if line_str:
+                pages.append(json.loads(line_str))
+
+    # Определяем границы страниц для разделов
+    p_personal: int | None = None
+    p_subject: int | None = None
+    p_thematic: int | None = None
+
+    for item in pages:
+        p = item["page"]
+        for l_item in item.get("text", "").split("\n"):
+            l_str = l_item.strip()
+            if re.match(r"^\s*ЛИЧНОСТНЫЕ\s+РЕЗУЛЬТАТЫ\s*$", l_str, re.I) and p_personal is None:
+                p_personal = p
+            elif re.match(r"^\s*ПРЕДМЕТНЫЕ\s+РЕЗУЛЬТАТЫ\s*$", l_str, re.I) and p_subject is None:
+                p_subject = p
+            elif re.match(r"^\s*ТЕМАТИЧЕСКОЕ\s+ПЛАНИРОВАНИЕ\s*$", l_str, re.I) and p_thematic is None:
+                p_thematic = p
+
+    p_personal = p_personal or 18
+    p_subject = p_subject or 21
+    p_thematic = p_thematic or len(pages)
+
+    # 1. Извлечение метапредметных и личностных результатов
     meta_annotated: list[tuple[int, str]] = []
-    for p in range(18, min(21, total_pages + 1)):
-        p_text = get_page_text(source_id, p, pages_dir)
-        if not p_text:
+    for p in range(p_personal, p_subject + 1):
+        txt = get_page_text(source_id, p, pages_dir)
+        if not txt:
             continue
-        for line in p_text.splitlines():
-            line = line.strip()
-            if not line or re.match(r"^\d+$", line):
+        for l_line in txt.splitlines():
+            l_strip = l_line.strip()
+            if not l_strip or l_strip.isdigit():
                 continue
-            meta_annotated.append((p, line))
+            meta_annotated.append((p, l_strip))
 
     meta_items: dict[str, list[tuple[int, str]]] = {
         "PERSONAL": [],
@@ -88,64 +189,44 @@ def extract_math_outcomes_from_frp(
         "REGULATORY": [],
     }
 
-    cur_section: str | None = None
+    cur_sec: str | None = None
     cur_p: int | None = None
     cur_lines: list[str] = []
 
     def flush_meta() -> None:
-        nonlocal cur_lines, cur_p, cur_section
-        if cur_lines and cur_section:
+        nonlocal cur_lines, cur_p, cur_sec
+        if cur_lines and cur_sec:
             text = " ".join(cur_lines).strip()
-            # Пропускаем вводные предложения и заголовки подразделов
             if text.endswith(";") or text.endswith("."):
-                # Исключаем вводный текст стандартов
-                if not any(
-                    intro in text
-                    for intro in (
-                        "достигаются в единстве",
-                        "В результате изучения математики",
-                        "следующие личностные результаты",
-                    )
-                ):
-                    meta_items[cur_section].append((cur_p or 18, text))
-            cur_lines = []
-
-    subhead_prefixes = (
-        "Базовые логические",
-        "Базовые исследовательские",
-        "Работа с информацией",
-        "Общение:",
-        "Самоорганизация:",
-        "Самоконтроль:",
-        "Совместная деятельность:",
-    )
+                meta_items[cur_sec].append((cur_p or p_personal, text))
+        cur_lines = []
+        cur_p = None
 
     for p, line in meta_annotated:
-        if line == "ЛИЧНОСТНЫЕ РЕЗУЛЬТАТЫ":
+        if line.startswith("ЛИЧНОСТНЫЕ РЕЗУЛЬТАТЫ"):
             flush_meta()
-            cur_section = "PERSONAL"
+            cur_sec = "PERSONAL"
             continue
-        if line == "Познавательные универсальные учебные действия":
+        if "Познавательные универсальные учебные действия" in line:
             flush_meta()
-            cur_section = "COGNITIVE"
+            cur_sec = "COGNITIVE"
             continue
-        if line == "Коммуникативные универсальные учебные действия":
+        if "Коммуникативные универсальные учебные действия" in line:
             flush_meta()
-            cur_section = "COMMUNICATIVE"
+            cur_sec = "COMMUNICATIVE"
             continue
-        if line == "Регулятивные универсальные учебные действия":
+        if "Регулятивные универсальные учебные действия" in line:
             flush_meta()
-            cur_section = "REGULATORY"
+            cur_sec = "REGULATORY"
             continue
-        if line == "ПРЕДМЕТНЫЕ РЕЗУЛЬТАТЫ":
+        if "ПРЕДМЕТНЫЕ РЕЗУЛЬТАТЫ" in line:
             flush_meta()
-            cur_section = None
+            cur_sec = None
             break
 
-        if cur_section is None:
+        if cur_sec is None:
             continue
-
-        if any(line.startswith(sh) for sh in subhead_prefixes):
+        if any(line.startswith(sh) for sh in SUBHEAD_PREFIXES):
             continue
         if "МЕТАПРЕДМЕТНЫЕ РЕЗУЛЬТАТЫ" in line or "универсальные учебные действия" in line:
             continue
@@ -163,107 +244,76 @@ def extract_math_outcomes_from_frp(
                 cur_lines.append(line)
     flush_meta()
 
-    # Формируем Outcomes для мета и личностных
-    for idx, (p, text) in enumerate(meta_items["PERSONAL"], start=1):
-        meta_outcomes.append(
-            Outcome(
-                outcome_id=f"math-noo-L-{idx:02d}",
-                type=OutcomeType.PERSONAL,
-                text=text,
-                quote_is_verbatim=True,
-                grade=None,
-                subject_id="math",
-                source_id=source_id,
-                section="Личностные результаты",
-                page=p,
-                source_url=f"{doc_url}#page={p}",
+    meta_outcomes: list[Outcome] = []
+    sec_map = {
+        "PERSONAL": (OutcomeType.PERSONAL, "L", "Личностные результаты"),
+        "COGNITIVE": (OutcomeType.COGNITIVE, "C", "Метапредметные результаты > Познавательные УУД"),
+        "COMMUNICATIVE": (OutcomeType.COMMUNICATIVE, "K", "Метапредметные результаты > Коммуникативные УУД"),
+        "REGULATORY": (OutcomeType.REGULATORY, "R", "Метапредметные результаты > Регулятивные УУД"),
+    }
+    for sec_key, (otype, code, sec_name) in sec_map.items():
+        for idx, (p, text) in enumerate(meta_items[sec_key], start=1):
+            meta_outcomes.append(
+                Outcome(
+                    outcome_id=f"{subject_id}-{level}-{code}-{idx:02d}",
+                    type=otype,
+                    text=text,
+                    quote_is_verbatim=True,
+                    grade=None,
+                    subject_id=subject_id,
+                    source_id=source_id,
+                    section=sec_name,
+                    page=p,
+                    source_url=f"{doc_url}#page={p}",
+                )
             )
-        )
 
-    for idx, (p, text) in enumerate(meta_items["COGNITIVE"], start=1):
-        meta_outcomes.append(
-            Outcome(
-                outcome_id=f"math-noo-C-{idx:02d}",
-                type=OutcomeType.COGNITIVE,
-                text=text,
-                quote_is_verbatim=True,
-                grade=None,
-                subject_id="math",
-                source_id=source_id,
-                section="Метапредметные результаты > Познавательные УУД",
-                page=p,
-                source_url=f"{doc_url}#page={p}",
-            )
-        )
-
-    for idx, (p, text) in enumerate(meta_items["COMMUNICATIVE"], start=1):
-        meta_outcomes.append(
-            Outcome(
-                outcome_id=f"math-noo-K-{idx:02d}",
-                type=OutcomeType.COMMUNICATIVE,
-                text=text,
-                quote_is_verbatim=True,
-                grade=None,
-                subject_id="math",
-                source_id=source_id,
-                section="Метапредметные результаты > Коммуникативные УУД",
-                page=p,
-                source_url=f"{doc_url}#page={p}",
-            )
-        )
-
-    for idx, (p, text) in enumerate(meta_items["REGULATORY"], start=1):
-        meta_outcomes.append(
-            Outcome(
-                outcome_id=f"math-noo-R-{idx:02d}",
-                type=OutcomeType.REGULATORY,
-                text=text,
-                quote_is_verbatim=True,
-                grade=None,
-                subject_id="math",
-                source_id=source_id,
-                section="Метапредметные результаты > Регулятивные УУД",
-                page=p,
-                source_url=f"{doc_url}#page={p}",
-            )
-        )
-
-    # 2. Извлечение предметных результатов (стр. 21-25)
-    subject_annotated: list[tuple[int, str]] = []
-    for p in range(21, min(26, total_pages + 1)):
-        p_text = get_page_text(source_id, p, pages_dir)
-        if not p_text:
+    # 2. Извлечение предметных результатов
+    subj_annotated: list[tuple[int, str]] = []
+    for p in range(p_subject, p_thematic):
+        txt = get_page_text(source_id, p, pages_dir)
+        if not txt:
             continue
-        for line in p_text.splitlines():
-            line = line.strip()
-            if not line or re.match(r"^\d+$", line):
+        for l_line in txt.splitlines():
+            l_strip = l_line.strip()
+            if not l_strip or l_strip.isdigit():
                 continue
-            subject_annotated.append((p, line))
+            subj_annotated.append((p, l_strip))
 
-    grades_items: dict[int, list[tuple[int, str]]] = {}
-    current_grade: int | None = None
+    grades_items: dict[int, list[tuple[int, str]]] = {1: [], 2: [], 3: [], 4: []}
+    cur_grade: int | None = None
     cur_p = None
     cur_lines = []
 
     def flush_grade() -> None:
-        nonlocal cur_lines, cur_p, current_grade
-        if cur_lines and current_grade is not None:
+        nonlocal cur_lines, cur_p, cur_grade
+        if cur_lines and cur_grade in grades_items:
             text = " ".join(cur_lines).strip()
-            if text:
-                grades_items[current_grade].append((cur_p or 21, text))
-            cur_lines = []
+            if text.endswith(";") or text.endswith("."):
+                grades_items[cur_grade].append((cur_p or p_subject, text))
+        cur_lines = []
+        cur_p = None
 
-    for p, line in subject_annotated:
-        m = re.match(r"К концу обучения в[о]?\s*(\d+)\s*классе", line)
+    for p, line in subj_annotated:
+        m = re.match(
+            r"^\s*К\s+концу\s+обучения\s+в[о]?\s+(\d+|первом|втором|третьем|четв[её]ртом)\s+классе",
+            line,
+            re.I,
+        )
         if m:
             flush_grade()
-            current_grade = int(m.group(1))
-            grades_items[current_grade] = []
+            cur_grade = GRADE_WORDS.get(m.group(1).lower())
             continue
-
-        if current_grade is None:
-            continue
-        if "результаты по отдельным темам" in line or line == "ПРЕДМЕТНЫЕ РЕЗУЛЬТАТЫ":
+        if re.match(r"^\s*ТЕМАТИЧЕСКОЕ\s+ПЛАНИРОВАНИЕ", line, re.I):
+            flush_grade()
+            break
+        if (
+            cur_grade is None
+            or "обучающийся получит" in line
+            or "обучающийся научится" in line
+            or "по отдельным темам" in line
+            or line == "ПРЕДМЕТНЫЕ РЕЗУЛЬТАТЫ"
+        ):
             continue
 
         if not cur_lines:
@@ -279,16 +329,17 @@ def extract_math_outcomes_from_frp(
                 cur_lines.append(line)
     flush_grade()
 
+    subject_outcomes: list[Outcome] = []
     for g, items in grades_items.items():
         for idx, (p, text) in enumerate(items, start=1):
             subject_outcomes.append(
                 Outcome(
-                    outcome_id=f"math-{g}-P-{idx:02d}",
+                    outcome_id=f"{subject_id}-{g}-P-{idx:02d}",
                     type=OutcomeType.SUBJECT,
                     text=text,
                     quote_is_verbatim=True,
                     grade=g,
-                    subject_id="math",
+                    subject_id=subject_id,
                     source_id=source_id,
                     section=f"Предметные результаты > {g} класс",
                     page=p,
@@ -299,45 +350,123 @@ def extract_math_outcomes_from_frp(
     return subject_outcomes, meta_outcomes
 
 
+def extract_math_outcomes_from_frp(
+    source_id: str,
+    doc_url: str,
+    total_pages: int,
+    pages_dir: Path,
+) -> tuple[list[Outcome], list[Outcome]]:
+    """Обратная совместимость: извлечение результатов для math."""
+    return extract_outcomes_from_frp(
+        source_id=source_id,
+        subject_id="math",
+        doc_url=doc_url,
+        pages_dir=pages_dir,
+        level="noo",
+    )
+
+
 def build_catalog_math_noo(settings: Settings) -> list[Outcome]:
-    """Строит полный каталог для math НОО:
-    - 6 эталонных результатов SK01 (P01..L01);
-    - все предметные результаты 1-4 классов;
-    - метапредметные и личностные результаты;
-    Сохраняет в data/knowledge/catalog/noo_math.json и noo_meta.json.
-    """
+    """Строит каталог для math НОО (включая P01..L01 кейса SK01)."""
     catalog_dir = settings.knowledge_dir / "catalog"
     catalog_dir.mkdir(parents=True, exist_ok=True)
     pages_dir = settings.knowledge_dir / "pages"
 
-    # Загружаем SK01
     sk01_ref = load_sk01_reference_outcomes(settings.case_reference_dir)
-
-    # Извлекаем из FRP-MATH-2025
     doc_url = "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf"
-    subject_outcomes, meta_outcomes = extract_math_outcomes_from_frp(
+
+    subject_outcomes, meta_outcomes = extract_outcomes_from_frp(
         source_id="FRP-MATH-2025",
+        subject_id="math",
         doc_url=doc_url,
-        total_pages=79,
         pages_dir=pages_dir,
+        level="noo",
     )
 
-    # Полный каталог noo_math:
-    # 1) Сначала 6 эталонных результатов SK01 (чтобы math/3 гарантированно их выдавал в начале)
-    # 2) Предметные результаты 1-4
-    # 3) Метапредметные результаты математики
     full_math_outcomes = list(sk01_ref) + subject_outcomes + meta_outcomes
 
-    # Сохраняем noo_math.json
     math_catalog_path = catalog_dir / "noo_math.json"
     math_data = [o.model_dump() for o in full_math_outcomes]
     math_catalog_path.write_text(json.dumps(math_data, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("Saved %d math outcomes to %s", len(full_math_outcomes), math_catalog_path)
 
-    # Сохраняем noo_meta.json
     meta_catalog_path = catalog_dir / "noo_meta.json"
     meta_data = [o.model_dump() for o in meta_outcomes]
     meta_catalog_path.write_text(json.dumps(meta_data, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("Saved %d meta outcomes to %s", len(meta_outcomes), meta_catalog_path)
 
     return full_math_outcomes
+
+
+def build_all_catalogs(settings: Settings) -> dict[str, list[Outcome]]:
+    """Строит каталоги для всех доступных предметов НОО:
+    - noo_math.json (с эталонами SK01)
+    - noo_russian.json
+    - noo_literary_reading.json
+    - noo_world.json
+    - noo_meta.json (все мета и личностные результаты)
+    """
+    catalog_dir = settings.knowledge_dir / "catalog"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+    pages_dir = settings.knowledge_dir / "pages"
+
+    sources_config = [
+        (
+            "FRP-MATH-2025",
+            "math",
+            "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf",
+        ),
+        (
+            "FRP-RUSSIAN-NOO-2025",
+            "russian",
+            "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_russkij-yazyk_1-4.pdf",
+        ),
+        (
+            "FRP-LITERARY-READING-NOO-2025",
+            "literary_reading",
+            "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_literaturnoe-chtenie_1-4.pdf",
+        ),
+        (
+            "FRP-WORLD-NOO-2025",
+            "world",
+            "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_okruzhayushhij-mir_1-4.pdf",
+        ),
+    ]
+
+    sk01_ref = load_sk01_reference_outcomes(settings.case_reference_dir)
+    results: dict[str, list[Outcome]] = {}
+    all_meta_outcomes: list[Outcome] = []
+
+    for source_id, subject_id, url in sources_config:
+        s_outcomes, m_outcomes = extract_outcomes_from_frp(
+            source_id=source_id,
+            subject_id=subject_id,
+            doc_url=url,
+            pages_dir=pages_dir,
+            level="noo",
+        )
+
+        all_meta_outcomes.extend(m_outcomes)
+
+        if subject_id == "math":
+            full_subject = list(sk01_ref) + s_outcomes + m_outcomes
+        else:
+            full_subject = s_outcomes + m_outcomes
+
+        results[subject_id] = full_subject
+        subj_file = catalog_dir / f"noo_{subject_id}.json"
+        subj_file.write_text(
+            json.dumps([o.model_dump() for o in full_subject], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        logger.info("Saved %d outcomes for %s to %s", len(full_subject), subject_id, subj_file)
+
+    # Сохраняем объединенный noo_meta.json
+    meta_file = catalog_dir / "noo_meta.json"
+    meta_file.write_text(
+        json.dumps([o.model_dump() for o in all_meta_outcomes], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    logger.info("Saved %d total meta outcomes to %s", len(all_meta_outcomes), meta_file)
+
+    return results

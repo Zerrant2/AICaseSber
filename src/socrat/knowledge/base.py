@@ -6,12 +6,15 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import logging
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pymupdf
 import yaml
 
 from socrat.config import Settings
@@ -30,9 +33,12 @@ from socrat.contracts import (
     TopicCheck,
     UpdateReport,
 )
-from socrat.knowledge.catalog import build_catalog_math_noo
+from socrat.knowledge.catalog import build_all_catalogs
+from socrat.knowledge.chunker import chunk_document, chunk_pages_file, save_chunks
 from socrat.knowledge.downloader import download_all, load_manifest, load_sources_registry
+from socrat.knowledge.index import KnowledgeIndex, build_embeddings_for_index
 from socrat.knowledge.parser import get_page_text, parse_and_save_pdf
+from socrat.knowledge.retriever import Retriever
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +56,15 @@ class LocalKnowledgeBase:
         self._outcomes_by_id: dict[str, Outcome] = {}
         self._problems: list[str] = []
         self._ready: bool = False
+        self._last_update: datetime | None = None
+
+        self.index: KnowledgeIndex = KnowledgeIndex([])
+        self.retriever: Retriever = Retriever(self.index, self._sources, self.settings)
 
         self._load()
 
     def _load(self) -> None:
-        """Загружает манифест, каталог и список предметов. При отсутствии файлов не падает."""
+        """Загружает манифест, каталог, список предметов и поисковый индекс."""
         self._problems.clear()
 
         # 1. Загрузка subjects.yaml
@@ -89,9 +99,9 @@ class LocalKnowledgeBase:
                         note=doc_data.get("note"),
                     )
                 except Exception as e:
-                    logger.warning("Error parsing document %s from manifest: %e", sid, e)
+                    logger.warning("Error parsing document %s from manifest: %s", sid, e)
         else:
-            # Fallback: читаем sources.yaml, чтобы знать доступные источники
+            # Fallback: читаем sources.yaml
             src_list = load_sources_registry(self.settings.sources_file)
             for s in src_list:
                 sid = s["source_id"]
@@ -108,18 +118,18 @@ class LocalKnowledgeBase:
                         note=s.get("note"),
                     )
                 except Exception as e:
-                    logger.warning("Error creating fallback source %s: %e", sid, e)
+                    logger.warning("Error creating fallback source %s: %s", sid, e)
 
         if not self._sources:
             self._problems.append("Нормативные источники не зарегистрированы")
 
-        # 3. Загрузка каталога
+        # 3. Загрузка каталога планируемых результатов
         catalog_dir = self.settings.knowledge_dir / "catalog"
         self._outcomes.clear()
         self._outcomes_by_id.clear()
 
         if catalog_dir.exists():
-            for c_file in catalog_dir.glob("*.json"):
+            for c_file in sorted(catalog_dir.glob("*.json")):
                 try:
                     data = json.loads(c_file.read_text(encoding="utf-8"))
                     if isinstance(data, list):
@@ -134,7 +144,29 @@ class LocalKnowledgeBase:
         if not self._outcomes:
             self._problems.append("Каталог планируемых результатов пуст или не найден")
 
-        # База готова, если есть хотя бы один источник и результаты
+        # 4. Загрузка поискового индекса
+        index_dir = self.settings.knowledge_dir / "index"
+        if (index_dir / "chunks.jsonl").exists():
+            try:
+                self.index = KnowledgeIndex.load(index_dir)
+            except Exception as e:
+                logger.warning("Failed to load KnowledgeIndex from %s: %s", index_dir, e)
+                self.index = KnowledgeIndex([])
+        else:
+            # Если индекса на диске нет, но есть нарезанные чанки или страницы
+            chunks_dir = self.settings.knowledge_dir / "chunks"
+            all_chunks: list[Chunk] = []
+            if chunks_dir.exists():
+                for ch_file in chunks_dir.glob("*.jsonl"):
+                    with open(ch_file, encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                all_chunks.append(Chunk.model_validate_json(line))
+            self.index = KnowledgeIndex(all_chunks)
+
+        self.retriever = Retriever(self.index, self._sources, self.settings)
+
+        # База готова, если есть зарегистрированные источники и загруженный каталог
         self._ready = bool(self._sources and self._outcomes)
 
     def list_subjects(self, grade: int) -> list[Subject]:
@@ -144,7 +176,6 @@ class LocalKnowledgeBase:
         except ValueError:
             return []
 
-        # Находим предметы, для которых есть ФРП этого уровня
         available_frp_subjects = {
             doc.subject_id
             for doc in self._sources.values()
@@ -177,64 +208,75 @@ class LocalKnowledgeBase:
         return None
 
     def check_topic(self, grade: int, subject_id: str, topic: str) -> TopicCheck:
-        """Проверяет соответствие темы программе класса."""
-        topic_lower = topic.lower()
+        """Проверяет соответствие темы учителя программе класса по предмету."""
+        # 1. Поиск по фрагментам содержания и предметных результатов
+        hits = self.retriever.search(
+            query=topic,
+            grade=grade,
+            subject_id=subject_id,
+            kinds=[ChunkKind.CONTENT, ChunkKind.SUBJECT_RESULT],
+            k=5,
+        )
 
-        # Базовые темы математики 3 класса для проверки и подсказок
-        math3_program_topics = [
-            "Умножение и деление в пределах 100",
-            "Решение текстовых задач в одно-два действия",
-            "Сложение и вычитание в пределах 1000",
-            "Периметр и площадь прямоугольника",
-            "Порядок действий в числовых выражениях",
-            "Деление с остатком",
-            "Доли величин (половина, четверть)",
-        ]
-
-        # Ищем совпадения в каталоге результатов данного предмета и класса
-        class_outcomes = [o for o in self._outcomes if o.subject_id == subject_id and o.grade == grade]
-
-        matched: list[str] = []
-        best_score = 0.0
-
-        topic_words = set(re.findall(r"[а-яёa-z0-9]{3,}", topic_lower))
-        for o in class_outcomes:
-            o_words = set(re.findall(r"[а-яёa-z0-9]{3,}", o.text.lower()))
-            if not topic_words or not o_words:
-                continue
-            common = topic_words & o_words
-            score = len(common) / len(topic_words)
-            if score > best_score:
-                best_score = score
-                matched.append(o.text)
-
-        # Проверка ключевых корней для математики 3 класса
-        if grade == 3 and subject_id == "math":
-            math3_roots = (
-                "умнож",
-                "делен",
-                "задач",
-                "табли",
-                "площад",
-                "периметр",
-                "вычисл",
-                "арифмет",
-                "сложен",
-                "вычитан",
-            )
-            if any(r in topic_lower for r in math3_roots):
-                best_score = max(best_score, 0.85)
-                matched.append("Умножение и деление в пределах 100")
-
+        best_score = hits[0].score if hits else 0.0
         in_prog = best_score >= 0.4
-        suggestions = [] if in_prog else math3_program_topics[:5]
+
+        matched_topics: list[str] = []
+        for h in hits:
+            if h.score >= 0.4:
+                first_line = h.chunk.text.split("\n")[0].strip()
+                matched_topics.append(first_line[:80])
+
+        # 2. Подсказки тем (до 5 коротких названий)
+        suggestions: list[str] = []
+        if not in_prog:
+            # Извлекаем темы из фрагментов раздела «Содержание обучения» этого класса
+            content_chunks = [
+                c
+                for c in self.index.chunks
+                if c.grade == grade
+                and (c.subject_id is None or c.subject_id == subject_id)
+                and c.kind == ChunkKind.CONTENT
+            ]
+            seen_topics: set[str] = set()
+            ignore_keywords = {"универсальные", "планирование", "результаты", "деятельность", "действия"}
+            for ch in content_chunks:
+                for line in ch.text.split("\n"):
+                    for sentence in re.split(r"[;\.]", line):
+                        s_clean = sentence.strip()
+                        if 10 <= len(s_clean) <= 60 and not any(
+                            w in s_clean.lower() for w in ignore_keywords
+                        ):
+                            s_title = s_clean[0].upper() + s_clean[1:]
+                            if s_title not in seen_topics:
+                                seen_topics.add(s_title)
+                                suggestions.append(s_title)
+                                if len(suggestions) >= 5:
+                                    break
+                    if len(suggestions) >= 5:
+                        break
+
+            # Fallback для 3 класса математики при необходимости
+            if len(suggestions) < 5 and grade == 3 and subject_id == "math":
+                math3_default = [
+                    "Умножение и деление в пределах 100",
+                    "Решение текстовых задач в одно-два действия",
+                    "Сложение и вычитание в пределах 1000",
+                    "Периметр и площадь прямоугольника",
+                    "Деление с остатком",
+                ]
+                for d in math3_default:
+                    if d not in suggestions:
+                        suggestions.append(d)
+                        if len(suggestions) >= 5:
+                            break
 
         return TopicCheck(
             in_program=in_prog,
             confidence=min(1.0, max(0.1, best_score)),
-            matched_topics=list(dict.fromkeys(matched))[:3] if in_prog else [],
-            suggestions=suggestions,
-            evidence=[],
+            matched_topics=list(dict.fromkeys(matched_topics))[:3],
+            suggestions=suggestions[:5],
+            evidence=hits,
         )
 
     def get_outcomes(
@@ -279,13 +321,13 @@ class LocalKnowledgeBase:
             and (not types or o.type in types)
         ]
 
-        # Для math/3 гарантируем результаты кейса SK01 первыми
         sk01_items: list[Outcome] = []
         regular_items: list[Outcome] = []
 
         combined = subject_outcomes + meta_outcomes
         seen_ids: set[str] = set()
 
+        # Для math/3 кейса SK01: всегда первыми
         if grade == 3 and subject_id == "math":
             for cid in SK01_CASE_IDS:
                 o = self._outcomes_by_id.get(cid)
@@ -298,16 +340,13 @@ class LocalKnowledgeBase:
                 regular_items.append(o)
                 seen_ids.add(o.outcome_id)
 
-        # Если есть поисковый запрос, ранжируем обычные элементы по совпадению
+        # Ранжирование по поисковому запросу при наличии
         if query:
             q_lower = query.lower()
-            q_words = set(re.findall(r"[а-яёa-z0-9]{3,}", q_lower))
+            q_words = set(q_lower.split())
 
             def _rank_key(item: Outcome) -> float:
-                i_lower = item.text.lower()
-                if not q_words:
-                    return 0.0
-                i_words = set(re.findall(r"[а-яёa-z0-9]{3,}", i_lower))
+                i_words = set(item.text.lower().split())
                 return len(q_words & i_words)
 
             regular_items.sort(key=_rank_key, reverse=True)
@@ -327,43 +366,15 @@ class LocalKnowledgeBase:
         k: int = 8,
         include_school_materials: bool = True,
     ) -> list[SearchHit]:
-        """Простой поиск по тексту результатов и документов."""
-        q_lower = query.lower()
-        q_words = set(re.findall(r"[а-яёa-z0-9]{3,}", q_lower))
-        hits: list[SearchHit] = []
-
-        for o in self._outcomes:
-            if grade is not None and o.grade is not None and o.grade != grade:
-                continue
-            if subject_id is not None and o.subject_id is not None and o.subject_id != subject_id:
-                continue
-
-            o_words = set(re.findall(r"[а-яёa-z0-9]{3,}", o.text.lower()))
-            overlap = len(q_words & o_words) if q_words else 0
-            if overlap > 0 or q_lower in o.text.lower():
-                score = overlap / max(1, len(q_words))
-                chunk = Chunk(
-                    chunk_id=f"{o.source_id}:{o.page}:{o.outcome_id}",
-                    source_id=o.source_id,
-                    page=o.page,
-                    section=o.section,
-                    text=o.text,
-                    kind=ChunkKind.SUBJECT_RESULT if o.type == OutcomeType.SUBJECT else ChunkKind.META_RESULT,
-                    grade=o.grade,
-                    subject_id=o.subject_id,
-                )
-                source_doc = self._sources.get(o.source_id)
-                hits.append(
-                    SearchHit(
-                        chunk=chunk,
-                        score=score,
-                        source_title=source_doc.title if source_doc else o.source_id,
-                        source_url=o.source_url,
-                    )
-                )
-
-        hits.sort(key=lambda h: h.score, reverse=True)
-        return hits[:k]
+        """Гибридный поиск по фрагментам документов (BM25 + эмбеддинги)."""
+        return self.retriever.search(
+            query=query,
+            grade=grade,
+            subject_id=subject_id,
+            kinds=kinds,
+            k=k,
+            include_school_materials=include_school_materials,
+        )
 
     def get_page_text(self, source_id: str, page: int) -> str | None:
         """Возвращает очищенный текст страницы PDF."""
@@ -376,21 +387,24 @@ class LocalKnowledgeBase:
     def status(self) -> KnowledgeStatus:
         return KnowledgeStatus(
             documents=list(self._sources.values()),
-            chunks_total=len(self._outcomes),
+            chunks_total=len(self.index.chunks),
             outcomes_total=len(self._outcomes),
-            embeddings_enabled=bool(self.settings.embeddings_base_url),
-            last_update=None,
+            embeddings_enabled=bool(self.settings.embeddings_base_url and self.settings.embeddings_model),
+            last_update=self._last_update,
             ready=self._ready,
             problems=list(self._problems),
         )
 
     async def update(self, progress: ProgressCallback | None = None) -> UpdateReport:
-        """Скачивает/обновляет документы, парсит и пересобирает каталог."""
+        """Полный цикл обновления: G2 (скачивание) -> G3 (парсинг) -> G4 (нарезка) -> G5 (каталог) -> G6 (индекс)."""
+        start_time = datetime.now(UTC)
+
+        # 1. G2: Скачивание
         if progress:
-            await progress("Запуск скачивания источников…")
+            await progress("Скачивание нормативных документов…")
         report = await download_all(self.settings, progress)
 
-        # Парсим скачанные и существующие PDF
+        # 2. G3: Парсинг страниц PDF
         raw_dir = self.settings.knowledge_dir / "raw"
         pages_dir = self.settings.knowledge_dir / "pages"
         pages_dir.mkdir(parents=True, exist_ok=True)
@@ -401,15 +415,45 @@ class LocalKnowledgeBase:
                 await progress(f"Парсинг PDF {sid}…")
             parse_and_save_pdf(pdf_path, sid, pages_dir)
 
-        # Пересобираем каталог math
-        if progress:
-            await progress("Сборка каталога планируемых результатов…")
-        build_catalog_math_noo(self.settings)
+        # 3. G4: Нарезка на фрагменты (чанкинг)
+        chunks_dir = self.settings.knowledge_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
 
-        # Перезагружаем внутреннее состояние
+        all_chunks: list[Chunk] = []
+        for pages_file in pages_dir.glob("*.jsonl"):
+            sid = pages_file.stem
+            doc = self._sources.get(sid)
+            s_id = doc.subject_id if doc else None
+            if progress:
+                await progress(f"Нарезка разделов {sid}…")
+            doc_chunks = chunk_pages_file(pages_file, sid, s_id)
+            save_chunks(doc_chunks, chunks_dir / f"{sid}.jsonl")
+            all_chunks.extend(doc_chunks)
+
+        # 4. G5: Сборка каталогов результатов
+        if progress:
+            await progress("Сборка каталогов планируемых результатов…")
+        build_all_catalogs(self.settings)
+
+        # 5. G6: Сборка поискового индекса и эмбеддингов
+        if progress:
+            await progress("Построение поискового индекса BM25…")
+        index_dir = self.settings.knowledge_dir / "index"
+        self.index = KnowledgeIndex(all_chunks)
+        self.index.save(index_dir)
+
+        if self.settings.embeddings_base_url and self.settings.embeddings_model:
+            if progress:
+                await progress("Генерация векторных эмбеддингов…")
+            await build_embeddings_for_index(self.index, self.settings, index_dir)
+
+        # Перезагружаем состояние
         self._load()
+        self._last_update = datetime.now(UTC)
+
+        report.chunks_total = len(self.index.chunks)
         report.outcomes_total = len(self._outcomes)
-        report.chunks_total = len(self._outcomes)
+        report.duration_s = (datetime.now(UTC) - start_time).total_seconds()
 
         if progress:
             await progress("Обновление нормативной базы завершено.")
@@ -421,17 +465,59 @@ class LocalKnowledgeBase:
         content: bytes,
         progress: ProgressCallback | None = None,
     ) -> SourceDocument:
-        """Загрузка PDF школы как школьного материала (is_normative=False)."""
+        """Загрузка PDF/DOCX школы как школьного материала (is_normative=False)."""
         sha = hashlib.sha256(content).hexdigest()
         source_id = f"SCHOOL-{sha[:8]}"
-        doc = SourceDocument(
+
+        if progress:
+            await progress(f"Обработка школьного материала {filename}…")
+
+        pages: list[dict[str, Any]] = []
+
+        if filename.lower().endswith(".docx"):
+            # Извлечение из DOCX блоками по 3000 символов (G7)
+            import docx
+
+            doc = docx.Document(io.BytesIO(content))
+            full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+            page_size = 3000
+            if not full_text:
+                pages.append({"page": 1, "text": ""})
+            else:
+                for idx, start_idx in enumerate(range(0, len(full_text), page_size), start=1):
+                    pages.append({"page": idx, "text": full_text[start_idx : start_idx + page_size]})
+        else:
+            # Извлечение из PDF с помощью pymupdf
+            try:
+                doc_pdf = pymupdf.open(stream=content, filetype="pdf")
+                for idx, page in enumerate(doc_pdf, start=1):
+                    pages.append({"page": idx, "text": page.get_text("text")})
+            except Exception as e:
+                logger.warning("Could not parse PDF content via pymupdf: %s", e)
+                pages.append({"page": 1, "text": content.decode("utf-8", errors="ignore")})
+
+        source_doc = SourceDocument(
             source_id=source_id,
             title=filename,
             url=f"local://{filename}",
             doc_type=DocType.SCHOOL_MATERIAL,
             is_normative=False,
             sha256=sha,
-            bytes=len(content),
+            pages=len(pages),
         )
-        self._sources[source_id] = doc
-        return doc
+        self._sources[source_id] = source_doc
+
+        # Нарезаем и индексируем
+        material_chunks = chunk_document(source_id, pages, subject_id=None)
+        for ch in material_chunks:
+            self.index.add_chunk(ch)
+
+        # Сохраняем обновленный индекс
+        index_dir = self.settings.knowledge_dir / "index"
+        self.index.save(index_dir)
+        self.retriever = Retriever(self.index, self._sources, self.settings)
+
+        if progress:
+            await progress(f"Школьный материал {filename} успешно проиндексирован.")
+
+        return source_doc

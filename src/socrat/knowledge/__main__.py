@@ -9,9 +9,12 @@ import argparse
 import asyncio
 
 from socrat.config import get_settings
+from socrat.contracts import Chunk
 from socrat.knowledge.base import LocalKnowledgeBase
-from socrat.knowledge.catalog import build_catalog_math_noo
+from socrat.knowledge.catalog import build_all_catalogs
+from socrat.knowledge.chunker import chunk_pages_file, save_chunks
 from socrat.knowledge.downloader import download_all
+from socrat.knowledge.index import KnowledgeIndex
 from socrat.knowledge.parser import parse_and_save_pdf
 
 
@@ -64,15 +67,42 @@ async def main() -> None:
             print("Ошибки:", report.failed)
 
     elif args.command == "build":
-        print("Парсинг PDF...")
+        print("1. Парсинг PDF...")
         raw_dir = settings.knowledge_dir / "raw"
         pages_dir = settings.knowledge_dir / "pages"
-        for pdf in raw_dir.glob("*.pdf"):
-            print(f"Парсинг {pdf.name}...")
+        pages_dir.mkdir(parents=True, exist_ok=True)
+        for pdf in sorted(raw_dir.glob("*.pdf")):
+            print(f"  -> Парсинг {pdf.name}...")
             parse_and_save_pdf(pdf, pdf.stem, pages_dir)
-        print("Сборка каталога...")
-        outs = build_catalog_math_noo(settings)
-        print(f"Каталог собран: {len(outs)} результатов.")
+
+        print("2. Нарезка на фрагменты (чанкинг)...")
+        chunks_dir = settings.knowledge_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+        subj_map = {
+            "FRP-MATH-2025": "math",
+            "FRP-RUSSIAN-NOO-2025": "russian",
+            "FRP-LITERARY-READING-NOO-2025": "literary_reading",
+            "FRP-WORLD-NOO-2025": "world",
+        }
+        all_chunks: list[Chunk] = []
+        for p_file in sorted(pages_dir.glob("*.jsonl")):
+            sid = p_file.stem
+            subj = subj_map.get(sid)
+            print(f"  -> Нарезка {sid}...")
+            chunks = chunk_pages_file(p_file, sid, subj)
+            save_chunks(chunks, chunks_dir / f"{sid}.jsonl")
+            all_chunks.extend(chunks)
+
+        print("3. Сборка каталогов результатов...")
+        catalogs = build_all_catalogs(settings)
+        total_outcomes = sum(len(v) for v in catalogs.values())
+        print(f"  -> Каталоги собраны: {total_outcomes} результатов.")
+
+        print("4. Построение поискового индекса BM25...")
+        index_dir = settings.knowledge_dir / "index"
+        index = KnowledgeIndex(all_chunks)
+        index.save(index_dir)
+        print(f"  -> Индекс сохранён: {len(all_chunks)} фрагментов.")
 
     elif args.command == "status":
         kb = LocalKnowledgeBase(settings)
