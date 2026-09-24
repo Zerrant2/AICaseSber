@@ -469,4 +469,203 @@ def build_all_catalogs(settings: Settings) -> dict[str, list[Outcome]]:
     )
     logger.info("Saved %d total meta outcomes to %s", len(all_meta_outcomes), meta_file)
 
+    # Строим каталоги ООО
+    ooo_results = build_ooo_catalogs(settings)
+    results.update(ooo_results)
+
+    return results
+
+
+OOO_SOURCES_CONFIG: list[dict[str, Any]] = [
+    {
+        "source_id": "FRP-MATH-OOO-2025",
+        "subject_id": "math",
+        "grades": [5, 6],
+        "page_start": 17,
+        "page_end": 20,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+    },
+    {
+        "source_id": "FRP-ALGEBRA-OOO-2025",
+        "subject_id": "algebra",
+        "grades": [7, 8, 9],
+        "page_start": 44,
+        "page_end": 49,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+    },
+    {
+        "source_id": "FRP-GEOMETRY-OOO-2025",
+        "subject_id": "geometry",
+        "grades": [7, 8, 9],
+        "page_start": 72,
+        "page_end": 76,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+    },
+    {
+        "source_id": "FRP-RUSSIAN-OOO-2025",
+        "subject_id": "russian",
+        "grades": [5, 6, 7, 8, 9],
+        "page_start": 32,
+        "page_end": 55,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_russkij-yazyk_5-9.pdf",
+    },
+    {
+        "source_id": "FRP-BIOLOGY-OOO-2025",
+        "subject_id": "biology",
+        "grades": [5, 6, 7, 8, 9],
+        "page_start": 31,
+        "page_end": 40,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_biologiya_5-9_baza.pdf",
+    },
+    {
+        "source_id": "FRP-PHYSICS-OOO-2025",
+        "subject_id": "physics",
+        "grades": [7, 8, 9],
+        "page_start": 21,
+        "page_end": 30,
+        "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_fizika-7-9_baz.pdf",
+    },
+]
+
+
+def extract_ooo_outcomes_from_frp(
+    source_id: str,
+    subject_id: str,
+    target_grades: list[int],
+    page_start: int,
+    page_end: int,
+    doc_url: str,
+    pages_dir: Path,
+) -> list[Outcome]:
+    """Извлекает предметные результаты ООО (5–9 классы) из страниц ФРП."""
+    p_file = pages_dir / f"{source_id}.jsonl"
+    if not p_file.exists():
+        logger.warning("Pages file not found: %s", p_file)
+        return []
+
+    pages: list[dict[str, Any]] = []
+    with open(p_file, encoding="utf-8") as f:
+        for line in f:
+            line_str = line.strip()
+            if line_str:
+                pages.append(json.loads(line_str))
+
+    annotated: list[tuple[int, str]] = []
+    for item in pages:
+        p = item["page"]
+        if page_start <= p <= page_end:
+            for l_item in item.get("text", "").split("\n"):
+                ls = l_item.strip()
+                if ls and not ls.isdigit():
+                    annotated.append((p, ls))
+
+    grade_items: dict[int, list[tuple[int, str]]] = {g: [] for g in target_grades}
+    cur_grade: int | None = None
+    cur_lines: list[str] = []
+    cur_p: int | None = None
+
+    def flush() -> None:
+        nonlocal cur_lines, cur_p, cur_grade
+        if cur_lines and cur_grade in target_grades:
+            text = " ".join(cur_lines).strip()
+            if text.endswith(";") or text.endswith("."):
+                grade_items[cur_grade].append((cur_p or page_start, text))
+        cur_lines = []
+        cur_p = None
+
+    for i in range(len(annotated)):
+        p, line = annotated[i]
+        combined = line
+        if i + 1 < len(annotated):
+            combined += " " + annotated[i + 1][1]
+
+        m = re.search(
+            r"к\s+концу\s+обучения.*?\s+в[о]?\s+(\d+|пятом|шестом|седьмом|восьмом|девятом)\s+классе",
+            combined,
+            re.I,
+        )
+        if m:
+            raw_g = m.group(1).lower()
+            g = GRADE_WORDS.get(raw_g) or (int(raw_g) if raw_g.isdigit() else None)
+            if g in target_grades:
+                flush()
+                cur_grade = g
+                continue
+
+        if "ТЕМАТИЧЕСКОЕ ПЛАНИРОВАНИЕ" in line:
+            flush()
+            cur_grade = None
+            break
+
+        if cur_grade is None:
+            continue
+        if "обучающийся научится" in line.lower() or "предметные результаты" in line.lower():
+            continue
+
+        if not cur_lines:
+            cur_p = p
+            cur_lines.append(line)
+        else:
+            prev = cur_lines[-1]
+            if prev.endswith(";") or prev.endswith("."):
+                flush()
+                cur_p = p
+                cur_lines = [line]
+            else:
+                cur_lines.append(line)
+    flush()
+
+    outcomes: list[Outcome] = []
+    for g in target_grades:
+        for idx, (p, text) in enumerate(grade_items[g], start=1):
+            outcomes.append(
+                Outcome(
+                    outcome_id=f"{subject_id}-{g}-P-{idx:02d}",
+                    type=OutcomeType.SUBJECT,
+                    text=text,
+                    quote_is_verbatim=True,
+                    grade=g,
+                    subject_id=subject_id,
+                    source_id=source_id,
+                    section=f"Предметные результаты > {g} класс",
+                    page=p,
+                    source_url=f"{doc_url}#page={p}",
+                )
+            )
+    return outcomes
+
+
+def build_ooo_catalogs(settings: Settings) -> dict[str, list[Outcome]]:
+    """Строит каталоги для предметов ООО:
+    - ooo_math.json
+    - ooo_algebra.json
+    - ooo_geometry.json
+    - ooo_russian.json
+    - ooo_biology.json
+    - ooo_physics.json
+    """
+    catalog_dir = settings.knowledge_dir / "catalog"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+    pages_dir = settings.knowledge_dir / "pages"
+
+    results: dict[str, list[Outcome]] = {}
+    for cfg in OOO_SOURCES_CONFIG:
+        subj = cfg["subject_id"]
+        outcomes = extract_ooo_outcomes_from_frp(
+            source_id=cfg["source_id"],
+            subject_id=subj,
+            target_grades=cfg["grades"],
+            page_start=cfg["page_start"],
+            page_end=cfg["page_end"],
+            doc_url=cfg["url"],
+            pages_dir=pages_dir,
+        )
+        results[subj] = outcomes
+        subj_file = catalog_dir / f"ooo_{subj}.json"
+        subj_file.write_text(
+            json.dumps([o.model_dump() for o in outcomes], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        logger.info("Saved %d OOO outcomes for %s to %s", len(outcomes), subj, subj_file)
+
     return results

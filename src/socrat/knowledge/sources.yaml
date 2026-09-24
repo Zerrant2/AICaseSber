@@ -69,13 +69,31 @@ sources:
     note: "Первоначальное опубликование"
 
   - source_id: FRP-MATH-OOO-2025
-    title: "Федеральная рабочая программа «Математика» (базовый уровень) 5–9 классы, Москва 2025"
+    title: "Федеральная рабочая программа «Математика» 5–6 классы, Москва 2025"
     url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf"
     doc_type: frp
     edu_levels: [ooo]
     subject_id: math
-    grades: [5, 6, 7, 8, 9]
-    note: "Включает курсы: Математика 5–6, Алгебра 7–9, Геометрия 7–9, Вероятность и статистика 7–9"
+    grades: [5, 6]
+    note: "Часть единой программы ООО Математика 5–9 (стр. 17–19)"
+
+  - source_id: FRP-ALGEBRA-OOO-2025
+    title: "Федеральная рабочая программа «Алгебра» 7–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: algebra
+    grades: [7, 8, 9]
+    note: "Курс «Алгебра» единой программы ООО Математика 5–9 (стр. 44–48)"
+
+  - source_id: FRP-GEOMETRY-OOO-2025
+    title: "Федеральная рабочая программа «Геометрия» 7–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: geometry
+    grades: [7, 8, 9]
+    note: "Курс «Геометрия» единой программы ООО Математика 5–9 (стр. 72–75)"
 
   - source_id: FRP-RUSSIAN-OOO-2025
     title: "Федеральная рабочая программа «Русский язык» 5–9 классы, Москва 2025"
