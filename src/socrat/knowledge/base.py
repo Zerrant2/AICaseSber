@@ -36,13 +36,203 @@ from socrat.contracts import (
 from socrat.knowledge.catalog import build_all_catalogs
 from socrat.knowledge.chunker import chunk_document, chunk_pages_file, save_chunks
 from socrat.knowledge.downloader import download_all, load_manifest, load_sources_registry
-from socrat.knowledge.index import KnowledgeIndex, build_embeddings_for_index
+from socrat.knowledge.index import RUSSIAN_STOPWORDS, KnowledgeIndex, build_embeddings_for_index
 from socrat.knowledge.parser import get_page_text, parse_and_save_pdf
 from socrat.knowledge.retriever import Retriever
 
 logger = logging.getLogger(__name__)
 
 SK01_CASE_IDS = ("P01", "P02", "C01", "R01", "K01", "L01")
+
+RUSSIAN_ENDINGS: tuple[str, ...] = (
+    "евшимися",
+    "овавшимися",
+    "евшими",
+    "овавшими",
+    "ившимися",
+    "ывшимися",
+    "ившими",
+    "ывшими",
+    "ившихся",
+    "ывшихся",
+    "евшихся",
+    "ующихся",
+    "ющихся",
+    "ающихся",
+    "яющихся",
+    "ившийся",
+    "ывшийся",
+    "евшийся",
+    "ующийся",
+    "ющийся",
+    "ающийся",
+    "яющийся",
+    "анными",
+    "янными",
+    "енными",
+    "енного",
+    "енному",
+    "анного",
+    "янного",
+    "анному",
+    "янному",
+    "анном",
+    "янном",
+    "енном",
+    "анных",
+    "янных",
+    "енных",
+    "анная",
+    "янная",
+    "енная",
+    "анную",
+    "янную",
+    "енную",
+    "анное",
+    "янное",
+    "енное",
+    "анные",
+    "янные",
+    "енные",
+    "тельными",
+    "тельного",
+    "тельному",
+    "тельном",
+    "тельных",
+    "тельная",
+    "тельную",
+    "тельное",
+    "тельные",
+    "тельный",
+    "ческими",
+    "ческого",
+    "ческому",
+    "ческом",
+    "ческих",
+    "ческая",
+    "ческую",
+    "ческое",
+    "ческие",
+    "ческий",
+    "ованными",
+    "ованного",
+    "ованному",
+    "ованном",
+    "ованных",
+    "ованная",
+    "ованную",
+    "ованное",
+    "ованные",
+    "ованный",
+    "ениями",
+    "ениях",
+    "ением",
+    "ениям",
+    "ений",
+    "ение",
+    "ения",
+    "ению",
+    "ении",
+    "аниями",
+    "аниях",
+    "анием",
+    "аниям",
+    "аний",
+    "ание",
+    "ания",
+    "анию",
+    "ании",
+    "остями",
+    "остях",
+    "остям",
+    "остью",
+    "ости",
+    "ость",
+    "ыми",
+    "ими",
+    "ого",
+    "его",
+    "ому",
+    "ему",
+    "ых",
+    "их",
+    "ую",
+    "юю",
+    "ая",
+    "яя",
+    "ое",
+    "ее",
+    "ые",
+    "ие",
+    "ым",
+    "им",
+    "ом",
+    "ем",
+    "ый",
+    "ий",
+    "ой",
+    "ями",
+    "ами",
+    "ей",
+    "ев",
+    "ов",
+    "ам",
+    "ям",
+    "ах",
+    "ях",
+    "ся",
+    "сь",
+    "ть",
+    "ти",
+    "те",
+    "ет",
+    "ут",
+    "ют",
+    "ит",
+    "ат",
+    "ят",
+    "ил",
+    "ыл",
+    "ла",
+    "ло",
+    "ли",
+    "е",
+    "и",
+    "ы",
+    "а",
+    "я",
+    "о",
+    "у",
+    "ю",
+    "ь",
+)
+
+
+def stem_ru(word: str) -> str:
+    """Простой стеммер для русского языка."""
+    w = word.lower()
+    for end in RUSSIAN_ENDINGS:
+        if w.endswith(end) and len(w) - len(end) >= 3:
+            return w[: -len(end)]
+    return w
+
+
+def topic_coverage(topic: str, text: str) -> float:
+    """Вычисляет долю значимых слов темы, найденных в тексте."""
+    q_words = [
+        w for w in re.findall(r"[а-яёa-z0-9]+", topic.lower()) if w not in RUSSIAN_STOPWORDS and len(w) >= 2
+    ]
+    if not q_words:
+        q_words = [topic.lower()]
+
+    cand_words = set(re.findall(r"[а-яёa-z0-9]+", text.lower()))
+    cand_stems = {stem_ru(cw) for cw in cand_words}
+    matched = 0
+    for qw in q_words:
+        qst = stem_ru(qw)
+        if qst in cand_stems or any(len(qst) >= 4 and qst in cw for cw in cand_words):
+            matched += 1
+    return matched / len(q_words)
 
 
 class LocalKnowledgeBase:
@@ -265,13 +455,15 @@ class LocalKnowledgeBase:
         # 1. Поиск по фрагментам содержания и предметных результатов индекса (если индекс не пуст)
         hits: list[SearchHit] = []
         if len(self.index.chunks) > 0:
-            hits = self.retriever.search(
+            raw_hits = self.retriever.search(
                 query=topic,
                 grade=grade,
                 subject_id=subject_id,
                 kinds=[ChunkKind.CONTENT, ChunkKind.SUBJECT_RESULT],
                 k=5,
             )
+            # Фильтруем результаты: тема должна покрывать >= 60% значимых слов (G16)
+            hits = [h for h in raw_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
 
         best_score = hits[0].score if hits else 0.0
         in_prog = best_score >= 0.4
@@ -299,12 +491,13 @@ class LocalKnowledgeBase:
                 for o in target_outcomes
             ]
             temp_index = KnowledgeIndex(temp_chunks)
-            outcome_hits = Retriever(temp_index, self._sources).search(
+            raw_outcome_hits = Retriever(temp_index, self._sources).search(
                 topic,
                 grade=grade,
                 subject_id=subject_id,
                 k=5,
             )
+            outcome_hits = [h for h in raw_outcome_hits if topic_coverage(topic, h.chunk.text) >= 0.60]
             outcome_best_score = outcome_hits[0].score if outcome_hits else 0.0
             if outcome_best_score >= 0.4:
                 in_prog = True
@@ -381,7 +574,7 @@ class LocalKnowledgeBase:
 
         return TopicCheck(
             in_program=in_prog,
-            confidence=min(1.0, max(0.1, best_score)),
+            confidence=min(1.0, max(0.1, best_score)) if in_prog else 0.1,
             matched_topics=list(dict.fromkeys(matched_topics))[:3],
             suggestions=suggestions[:5],
             evidence=hits,

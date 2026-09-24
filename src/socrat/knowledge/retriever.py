@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 from socrat.config import Settings
-from socrat.contracts import Chunk, ChunkKind, SearchHit, SourceDocument
+from socrat.contracts import Chunk, ChunkKind, EduLevel, SearchHit, SourceDocument
 from socrat.knowledge.index import KnowledgeIndex, tokenize
 
 logger = logging.getLogger(__name__)
@@ -162,13 +162,25 @@ class Retriever:
                     continue
 
             # Проверка класса
-            if grade is not None and chunk.grade is not None:
-                if loosen_grade:
-                    if abs(chunk.grade - grade) > 1:
-                        continue
+            if grade is not None:
+                if chunk.grade is not None:
+                    if loosen_grade:
+                        if abs(chunk.grade - grade) > 1:
+                            continue
+                    else:
+                        if chunk.grade != grade:
+                            continue
                 else:
-                    if chunk.grade != grade:
-                        continue
+                    s_doc = self.sources.get(chunk.source_id)
+                    if s_doc:
+                        if s_doc.grades and grade not in s_doc.grades:
+                            continue
+                        try:
+                            lvl = EduLevel.for_grade(grade)
+                            if s_doc.edu_levels and lvl not in s_doc.edu_levels:
+                                continue
+                        except ValueError:
+                            pass
 
             candidates.append(chunk)
             indices.append(idx)
