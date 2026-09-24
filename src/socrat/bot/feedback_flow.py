@@ -144,7 +144,15 @@ async def _regenerate(
                 await message.answer_document(
                     BufferedInputFile(services.exporter.teacher_docx(revised), filename=teacher_name)
                 )
-        await status.edit_text(texts.FOLLOWUP_REGENERATED)
+        new_warnings = revised.warnings[len(work.warnings) :]
+        result_text = (
+            texts.FOLLOWUP_REGENERATED_WITH_WARNINGS.format(
+                warnings="\n".join(issue.message_ru for issue in new_warnings)
+            )
+            if new_warnings
+            else texts.FOLLOWUP_REGENERATED
+        )
+        await status.edit_text(result_text)
         await message.answer(
             texts.FOLLOWUP_NEXT_ACTION,
             reply_markup=_keyboard(
