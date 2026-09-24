@@ -166,6 +166,34 @@ def test_check_topic(test_kb: LocalKnowledgeBase):
     assert res_fail.suggestions  # предлагает темы программы
 
 
+def test_check_topic_g16_cross_grade_rejection(test_kb: LocalKnowledgeBase):
+    """Проверка G16: отсечение тем чужого класса и тем не из программы."""
+    negatives = [
+        (3, "math", "Квадратные уравнения"),
+        (7, "algebra", "Производная"),
+    ]
+    for grade, subject_id, topic in negatives:
+        res = test_kb.check_topic(grade, subject_id, topic)
+        assert not res.in_program, f"Topic '{topic}' should not be in program for {subject_id} {grade}"
+        assert len(res.suggestions) > 0, f"Expected suggestions for '{topic}'"
+        assert res.confidence <= 0.2
+
+    res_math3 = test_kb.check_topic(3, "math", "Умножение и деление чисел")
+    assert res_math3.in_program
+    assert res_math3.confidence >= 0.5
+
+    algebra_7_topics = [
+        "Линейная функция и её график",
+        "Степень с натуральным показателем",
+        "Одночлены и многочлены",
+        "Системы линейных уравнений",
+        "Формулы сокращенного умножения",
+    ]
+    for topic in algebra_7_topics:
+        res = test_kb.check_topic(7, "algebra", topic)
+        assert res.in_program, f"Topic '{topic}' should be in program for algebra 7"
+
+
 def test_check_topic_fallback_without_index_or_pages(tmp_path: Path):
     """Проверка работы check_topic на чистом клоне без index/ и pages/ (G10)."""
     real_settings = get_settings()
