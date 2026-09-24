@@ -122,6 +122,24 @@ async def test_work_flow_delivers_two_files(settings) -> None:
         await close_services(services)
 
 
+@pytest.mark.parametrize(
+    ("level", "expected_minutes"),
+    [("easy", "15.5"), ("basic", "17.5"), ("advanced", "18"), ("all", "18")],
+)
+async def test_count_buttons_use_selected_level_time(settings, monkeypatch, level, expected_minutes) -> None:
+    state = FSMContext(MemoryStorage(), StorageKey(bot_id=123, chat_id=123, user_id=123))
+    await state.update_data(grade=3, subject_id="math", level=level, uud_focus="balanced")
+    show = AsyncMock()
+    monkeypatch.setattr(work_flow, "_show", show)
+
+    await work_flow.show_count(MagicMock(spec=Message), state, settings)
+
+    assert await state.get_state() == work_flow.WorkFlow.count.state
+    rows = show.await_args.args[2]
+    labels = {callback: label for row in rows for label, callback in row}
+    assert labels["cw:n:4"] == f"4 · {expected_minutes} мин"
+
+
 async def test_blocking_guardrail_never_starts_generation(settings) -> None:
     state = FSMContext(MemoryStorage(), StorageKey(bot_id=123, chat_id=123, user_id=123))
     await state.update_data(
