@@ -78,6 +78,18 @@ def fixture_work() -> DiagnosticWork:
     return work
 
 
+def assert_observation_actions(message: MagicMock, work_id: str) -> None:
+    call = message.answer.await_args
+    assert call.args == (texts.FOLLOWUP_NEXT_ACTION,)
+    buttons = [button for row in call.kwargs["reply_markup"].inline_keyboard for button in row]
+    assert [(button.text, button.callback_data) for button in buttons] == [
+        (texts.FOLLOWUP_OBSERVE_AGAIN, f"observe:{work_id}"),
+        (texts.FOLLOWUP_REGENERATE_AGAIN, f"regen:{work_id}"),
+        (texts.FOLLOWUP_FEEDBACK_ACTION, f"fbmenu:{work_id}"),
+    ]
+    assert all(len(button.callback_data.encode()) <= 64 for button in buttons)
+
+
 async def test_feedback_buttons_and_optional_down_comment(settings) -> None:
     services = await build_services(settings)
     work = fixture_work()
@@ -131,6 +143,7 @@ async def test_response_and_reflection_are_observed_without_storing_text(setting
         rendered = "\n".join(call.args[0] for call in answer.answer.await_args_list)
         assert "Предметный результат:" in rendered
         assert "УУД" in rendered
+        assert_observation_actions(answer, work.work_id)
         assert await flow_state.get_state() is None
 
         await feedback_flow.observation_reflection(
@@ -142,7 +155,9 @@ async def test_response_and_reflection_are_observed_without_storing_text(setting
         reflection.answer = AsyncMock()
         await feedback_flow.reflection_input(reflection, flow_state, services, session())
         reflection.delete.assert_awaited_once()
-        assert "Это сведения для беседы" in reflection.answer.await_args.args[0]
+        reflection_text = "\n".join(call.args[0] for call in reflection.answer.await_args_list)
+        assert "Это сведения для беседы" in reflection_text
+        assert_observation_actions(reflection, work.work_id)
         assert (await services.usage.summary(30)).by_kind["observation"] == 2
     finally:
         await close_services(services)

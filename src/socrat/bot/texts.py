@@ -138,6 +138,9 @@ FOLLOWUP_REGENERATED_WITH_WARNINGS = (
 )
 FOLLOWUP_REGENERATE_FAILED = "Не удалось перегенерировать задание. Попробуйте ещё раз."
 FOLLOWUP_NEXT_ACTION = "Что сделать дальше?"
+FOLLOWUP_OBSERVE_AGAIN = "🧪 Разобрать ещё"
+FOLLOWUP_REGENERATE_AGAIN = "🔁 Перегенерировать"
+FOLLOWUP_FEEDBACK_ACTION = "👍/👎 Отзыв"
 FOLLOWUP_CHOOSE_OBSERVATION = "Выберите задание или вопрос для рефлексии."
 FOLLOWUP_RESPONSE_PROMPT = (
     "Вставьте запись решения ученика так, как он написал её в работе, без имени. "
