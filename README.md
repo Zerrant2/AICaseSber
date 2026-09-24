@@ -66,6 +66,15 @@ docker compose logs -f bot
 
 Контейнер запускает `python -m socrat.bot`; каталог `./data` подключён как том для SQLite и материалов базы. Один и тот же токен Telegram-бота не следует использовать одновременно для локального процесса и контейнера с long polling. В `docker-compose.yml` приведён закомментированный пример сервиса Ollama для локальной модели.
 
+Проверить базу внутри контейнера можно без запуска второго экземпляра бота:
+
+```bash
+docker compose build bot
+docker compose run --rm --no-deps -e USE_FAKES=false --entrypoint python bot -m socrat.knowledge status
+```
+
+При запуске из корня репозитория каталог и извлечённые страницы доступны через том `./data:/app/data`; статус должен показывать `Ready: True`. SQLite в том же каталоге сохраняется между перезапусками контейнера.
+
 ## Тесты
 
 ```bash
