@@ -221,6 +221,35 @@ def test_check_topic_g17_different_grade_topics(test_kb: LocalKnowledgeBase):
     assert res_geom9.confidence >= 0.5
 
 
+def test_check_topic_input_validation_and_edge_cases(test_kb: LocalKnowledgeBase):
+    """Проверка валидации входных данных и граничных случаев в check_topic."""
+    # Недопустимые номера классов
+    for invalid_grade in (-1, 0, 12):
+        res = test_kb.check_topic(invalid_grade, "math", "Сложение")
+        assert not res.in_program
+        assert res.confidence == 0.0
+
+    # Предмет не изучается в этом классе
+    res_no_subj = test_kb.check_topic(3, "physics", "Тепловые явления")
+    assert not res_no_subj.in_program
+    assert res_no_subj.confidence == 0.0
+
+    res_alg5 = test_kb.check_topic(5, "algebra", "Уравнения")
+    assert not res_alg5.in_program
+    assert res_alg5.confidence == 0.0
+
+    # Пустая строка или пробелы
+    res_empty = test_kb.check_topic(3, "math", "   ")
+    assert not res_empty.in_program
+    assert res_empty.confidence == 0.0
+    assert len(res_empty.suggestions) > 0
+
+    # Разный регистр и знаки препинания
+    res_case = test_kb.check_topic(8, "geometry", "ТЕОРЕМА ПИФАГОРА")
+    assert res_case.in_program
+    assert res_case.confidence >= 0.5
+
+
 def test_check_topic_fallback_without_index_or_pages(tmp_path: Path):
     """Проверка работы check_topic на чистом клоне без index/ и pages/ (G10)."""
     real_settings = get_settings()

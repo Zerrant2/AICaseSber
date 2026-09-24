@@ -445,12 +445,42 @@ class LocalKnowledgeBase:
         return None
 
     def check_topic(self, grade: int, subject_id: str, topic: str) -> TopicCheck:
-        """Проверяет соответствие темы учителя программе класса по предмету (G10, G14)."""
+        """Проверяет соответствие темы учителя программе класса по предмету (G10, G14, G17)."""
+        try:
+            EduLevel.for_grade(grade)
+        except ValueError:
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=[],
+                evidence=[],
+            )
+
+        valid_subjects = {s.subject_id for s in self.list_subjects(grade)}
+        if not valid_subjects or subject_id not in valid_subjects:
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=[],
+                evidence=[],
+            )
+
         target_outcomes = [
             o
             for o in self._outcomes
             if o.grade == grade and (o.subject_id is None or o.subject_id == subject_id)
         ]
+
+        if not topic or not topic.strip():
+            return TopicCheck(
+                in_program=False,
+                confidence=0.0,
+                matched_topics=[],
+                suggestions=self._extract_suggestions(grade, subject_id, target_outcomes),
+                evidence=[],
+            )
 
         # 1. Поиск по фрагментам содержания и предметных результатов индекса (если индекс не пуст)
         hits: list[SearchHit] = []
@@ -533,66 +563,7 @@ class LocalKnowledgeBase:
         # 3. Подсказки тем (до 5 коротких названий)
         suggestions: list[str] = []
         if not in_prog:
-            # Сначала пытаемся извлечь темы из фрагментов раздела «Содержание обучения» этого класса
-            content_chunks = [
-                c
-                for c in self.index.chunks
-                if c.grade == grade
-                and (c.subject_id is None or c.subject_id == subject_id)
-                and c.kind == ChunkKind.CONTENT
-            ]
-            seen_topics: set[str] = set()
-            ignore_keywords = {"универсальные", "планирование", "результаты", "деятельность", "действия"}
-            for ch in content_chunks:
-                for line in ch.text.split("\n"):
-                    for sentence in re.split(r"[;\.]", line):
-                        s_clean = sentence.strip()
-                        if 10 <= len(s_clean) <= 60 and not any(
-                            w in s_clean.lower() for w in ignore_keywords
-                        ):
-                            s_title = s_clean[0].upper() + s_clean[1:]
-                            if s_title not in seen_topics:
-                                seen_topics.add(s_title)
-                                suggestions.append(s_title)
-                                if len(suggestions) >= 5:
-                                    break
-                    if len(suggestions) >= 5:
-                        break
-
-            # Если подсказок меньше 5 (или нет content_chunks), берём из каталога результатов (G14)
-            if len(suggestions) < 5 and target_outcomes:
-                for o in target_outcomes:
-                    first_phrase = o.text.split("\n")[0].split(";")[0].split(".")[0].strip()
-                    clean_phrase = re.sub(
-                        r"^(Числа и вычисления|Алгебраические выражения|Уравнения и неравенства|Функции|Наглядная геометрия|Геометрические фигуры|Язык и речь|СИСТЕМА ЯЗЫКА|Текст|Фонетика|Орфография|Лексикология|Морфемика|Морфология|Синтаксис)\s+",
-                        "",
-                        first_phrase,
-                        flags=re.I,
-                    ).strip()
-                    if 10 <= len(clean_phrase) <= 60 and not any(
-                        w in clean_phrase.lower() for w in ignore_keywords
-                    ):
-                        s_title = clean_phrase[0].upper() + clean_phrase[1:]
-                        if s_title not in seen_topics:
-                            seen_topics.add(s_title)
-                            suggestions.append(s_title)
-                            if len(suggestions) >= 5:
-                                break
-
-            # Fallback для 3 класса математики при необходимости
-            if len(suggestions) < 5 and grade == 3 and subject_id == "math":
-                math3_default = [
-                    "Умножение и деление в пределах 100",
-                    "Решение текстовых задач в одно-два действия",
-                    "Сложение и вычитание в пределах 1000",
-                    "Периметр и площадь прямоугольника",
-                    "Деление с остатком",
-                ]
-                for d in math3_default:
-                    if d not in suggestions:
-                        suggestions.append(d)
-                        if len(suggestions) >= 5:
-                            break
+            suggestions = self._extract_suggestions(grade, subject_id, target_outcomes)
 
         return TopicCheck(
             in_program=in_prog,
@@ -601,6 +572,70 @@ class LocalKnowledgeBase:
             suggestions=suggestions[:5],
             evidence=hits,
         )
+
+    def _extract_suggestions(self, grade: int, subject_id: str, target_outcomes: list[Outcome]) -> list[str]:
+        """Извлекает до 5 подсказок тем программы для указанного класса и предмета."""
+        suggestions: list[str] = []
+        # Сначала пытаемся извлечь темы из фрагментов раздела «Содержание обучения» этого класса
+        content_chunks = [
+            c
+            for c in self.index.chunks
+            if c.grade == grade
+            and (c.subject_id is None or c.subject_id == subject_id)
+            and c.kind == ChunkKind.CONTENT
+        ]
+        seen_topics: set[str] = set()
+        ignore_keywords = {"универсальные", "планирование", "результаты", "деятельность", "действия"}
+        for ch in content_chunks:
+            for line in ch.text.split("\n"):
+                for sentence in re.split(r"[;\.]", line):
+                    s_clean = sentence.strip()
+                    if 10 <= len(s_clean) <= 60 and not any(w in s_clean.lower() for w in ignore_keywords):
+                        s_title = s_clean[0].upper() + s_clean[1:]
+                        if s_title not in seen_topics:
+                            seen_topics.add(s_title)
+                            suggestions.append(s_title)
+                            if len(suggestions) >= 5:
+                                break
+                if len(suggestions) >= 5:
+                    break
+
+        # Если подсказок меньше 5 (или нет content_chunks), берём из каталога результатов (G14)
+        if len(suggestions) < 5 and target_outcomes:
+            for o in target_outcomes:
+                first_phrase = o.text.split("\n")[0].split(";")[0].split(".")[0].strip()
+                clean_phrase = re.sub(
+                    r"^(Числа и вычисления|Алгебраические выражения|Уравнения и неравенства|Функции|Наглядная геометрия|Геометрические фигуры|Язык и речь|СИСТЕМА ЯЗЫКА|Текст|Фонетика|Орфография|Лексикология|Морфемика|Морфология|Синтаксис)\s+",
+                    "",
+                    first_phrase,
+                    flags=re.I,
+                ).strip()
+                if 10 <= len(clean_phrase) <= 60 and not any(
+                    w in clean_phrase.lower() for w in ignore_keywords
+                ):
+                    s_title = clean_phrase[0].upper() + clean_phrase[1:]
+                    if s_title not in seen_topics:
+                        seen_topics.add(s_title)
+                        suggestions.append(s_title)
+                        if len(suggestions) >= 5:
+                            break
+
+        # Fallback для 3 класса математики при необходимости
+        if len(suggestions) < 5 and grade == 3 and subject_id == "math":
+            math3_default = [
+                "Умножение и деление в пределах 100",
+                "Решение текстовых задач в одно-два действия",
+                "Сложение и вычитание в пределах 1000",
+                "Периметр и площадь прямоугольника",
+                "Деление с остатком",
+            ]
+            for d in math3_default:
+                if d not in suggestions:
+                    suggestions.append(d)
+                    if len(suggestions) >= 5:
+                        break
+
+        return suggestions[:5]
 
     def get_outcomes(
         self,
