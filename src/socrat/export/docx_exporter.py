@@ -76,16 +76,28 @@ def _repeat_header(row) -> None:
     tr_pr.append(element)
 
 
+def _keep_row_together(row) -> None:
+    tr_pr = row._tr.get_or_add_trPr()
+    element = OxmlElement("w:cantSplit")
+    element.set(qn("w:val"), "true")
+    tr_pr.append(element)
+
+
 def _table(
     document: DocxDocument,
     headers: list[str],
     rows: list[list[str]],
     widths_mm: list[int] | None = None,
+    *,
+    keep_together: bool = False,
 ) -> None:
     table = document.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = widths_mm is None
+    if widths_mm:
+        for index, width in enumerate(widths_mm):
+            table.columns[index].width = Mm(width)
     for index, header in enumerate(headers):
         cell = table.rows[0].cells[index]
         cell.text = header
@@ -101,10 +113,15 @@ def _table(
             cells[index].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
             if widths_mm:
                 cells[index].width = Mm(widths_mm[index])
-    for row in table.rows:
+    for row_index, row in enumerate(table.rows):
+        _keep_row_together(row)
         for cell in row.cells:
             for paragraph in cell.paragraphs:
                 paragraph.paragraph_format.space_after = Pt(2)
+                if (row_index == 0 and len(table.rows) > 1) or (
+                    keep_together and row_index < len(table.rows) - 1
+                ):
+                    paragraph.paragraph_format.keep_with_next = True
                 for run in paragraph.runs:
                     run.font.name = "Times New Roman"
                     run.font.size = Pt(12)
@@ -225,7 +242,9 @@ class DocxExporter:
                     document.add_heading("Допустимые другие способы", level=3)
                     _bullets(document, task.alternative_solutions)
 
-                document.add_heading("Карта результатов", level=3)
+                document.add_page_break()
+                map_heading = document.add_heading("Карта результатов", level=3)
+                map_heading.paragraph_format.keep_with_next = True
                 _table(
                     document,
                     [
@@ -251,7 +270,8 @@ class DocxExporter:
                         ]
                         for link in task.outcome_links
                     ],
-                    [22, 23, 54, 38, 31, 12, 57, 20],
+                    [40, 16, 45, 38, 38, 14, 46, 20],
+                    keep_together=True,
                 )
 
                 document.add_heading("Наблюдаемые признаки УУД", level=3)
@@ -281,10 +301,18 @@ class DocxExporter:
                 )
 
                 if task.personal_orientation:
+                    orientation = re.sub(
+                        r"^Личностная направленность\s*[—:]\s*",
+                        "",
+                        task.personal_orientation.strip(),
+                        flags=re.IGNORECASE,
+                    )
+                    if not re.search(r"балл.*не став", orientation, flags=re.IGNORECASE):
+                        orientation += " Индивидуальный балл не ставится."
                     _line(
                         document,
                         "Личностная направленность",
-                        f"{task.personal_orientation} Индивидуальный балл не ставится.",
+                        orientation,
                     )
                 if task.typical_errors:
                     document.add_heading("Типичные ошибки", level=3)
