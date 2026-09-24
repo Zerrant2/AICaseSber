@@ -1,0 +1,35 @@
+{# Пользовательский промпт: один вариант работы по чертежу. Владелец: Claude. #}
+Составь {{ level_title }} вариант диагностической работы: ровно {{ slots|length }} задани{{ 'е' if slots|length == 1 else ('я' if slots|length < 5 else 'й') }} по теме «{{ topic }}» ({{ grade }} класс, {{ subject_name }}).
+
+## Уровень: {{ level_title }}
+- Опоры: {{ level.support_rule }}
+- Самостоятельность: {{ level.independence_rule }}
+- Данные и числа: {{ level.number_rule }}
+
+## Чертёж (номера и типы заданий менять нельзя)
+{% for s in slots %}
+- {{ s.describe() }}{% if s.extra_groups %} Можно также сделать наблюдаемым: {{ s.extra_groups|map(attribute='value')|join(', ') }}.{% endif %}
+
+{% endfor %}
+
+## Что заполнить для каждого задания
+- number — номер из чертежа; student_text — формулировка для ребёнка (с требованием-триггером); support — опора или null.
+- subject_goal — что ученик решает (предметная цель); meta_goal — какое действие можно увидеть.
+- expected_answer — краткий верный ответ; solution_steps — шаги с expression/result; alternative_solutions — другие верные способы.
+- subject_outcome_ids — 1–2 ID предметных результатов из списка.
+- uud — по одному элементу на каждую наблюдаемую группу: group, outcome_id (ID результата этой группы из списка), trigger (дословная цитата из student_text/support), action, evidence.
+- personal_orientation — практический смысл задачи (1 фраза, без оценки).
+- typical_errors — 1–2 типичные ошибки: description, layer (operational|conceptual|regulatory|communicative), interpretation (возможное объяснение), teacher_move.
+- oral_questions — 1–2 вопроса, которые учитель может задать устно.
+- technique_ids — 1–2 приёма из списка.
+- conducting_note — как проводить: какие подсказки допустимы, какие реплики исказят диагностику.
+
+Также заполни: title — короткое название темы для шапки листа; reflection_questions — 3 вопроса рефлексии для ребёнка (способ, проверка/ошибка, трудность и какая помощь нужна), без оценки чувств; level_rationale — 1–2 фразы, чем этот вариант отличается по опорам и самостоятельности.
+{% if teacher_note %}
+
+Пожелание учителя (выполни, если не противоречит правилам): {{ teacher_note }}
+{% endif %}
+{% if avoid %}
+
+Не повторяй эти формулировки: {% for a in avoid %}«{{ a }}»{% if not loop.last %}; {% endif %}{% endfor %}
+{% endif %}
