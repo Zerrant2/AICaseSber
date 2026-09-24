@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-24T09:57:21.655812+00:00",
+  "updated_at": "2026-09-24T11:23:42.794238+00:00",
   "documents": {
     "FRP-MATH-2025": {
       "source_id": "FRP-MATH-2025",
@@ -91,6 +91,280 @@
       "pages": 111,
       "checked_on": "2026-09-24",
       "local_path": "raw/FRP-WORLD-NOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-MATH-OOO-2025": {
+      "source_id": "FRP-MATH-OOO-2025",
+      "title": "Федеральная рабочая программа «Математика» 5–6 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "math",
+      "grades": [
+        5,
+        6
+      ],
+      "is_normative": true,
+      "sha256": "a7afed6d5b67bea7b22ec680a2a736473e408b7835f927659d0e0cc840203d4f",
+      "bytes": 1629454,
+      "pages": 143,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-MATH-OOO-2025.pdf",
+      "note": "Часть единой программы ООО Математика 5–9 (стр. 17–19)"
+    },
+    "FRP-ALGEBRA-OOO-2025": {
+      "source_id": "FRP-ALGEBRA-OOO-2025",
+      "title": "Федеральная рабочая программа «Алгебра» 7–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "algebra",
+      "grades": [
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "a7afed6d5b67bea7b22ec680a2a736473e408b7835f927659d0e0cc840203d4f",
+      "bytes": 1629454,
+      "pages": 143,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-MATH-OOO-2025.pdf",
+      "note": "Курс «Алгебра» единой программы ООО Математика 5–9 (стр. 44–48)"
+    },
+    "FRP-GEOMETRY-OOO-2025": {
+      "source_id": "FRP-GEOMETRY-OOO-2025",
+      "title": "Федеральная рабочая программа «Геометрия» 7–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "geometry",
+      "grades": [
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "a7afed6d5b67bea7b22ec680a2a736473e408b7835f927659d0e0cc840203d4f",
+      "bytes": 1629454,
+      "pages": 143,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-MATH-OOO-2025.pdf",
+      "note": "Курс «Геометрия» единой программы ООО Математика 5–9 (стр. 72–75)"
+    },
+    "FRP-RUSSIAN-OOO-2025": {
+      "source_id": "FRP-RUSSIAN-OOO-2025",
+      "title": "Федеральная рабочая программа «Русский язык» 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_russkij-yazyk_5-9.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "russian",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "6dee66686784a82103d9086d556b91fed2f889cd74af9d8c7e0134a7bcaf7387",
+      "bytes": 2343232,
+      "pages": 252,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-RUSSIAN-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-LITERATURE-OOO-2025": {
+      "source_id": "FRP-LITERATURE-OOO-2025",
+      "title": "Федеральная рабочая программа «Литература» 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_literatura_5-9.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "literature",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "ee71af2fd025b7760bdfd85689bb0a1cca0cd44a1e94371c4fe1f5ec9b42b7fa",
+      "bytes": 1843145,
+      "pages": 193,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-LITERATURE-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-HISTORY-OOO-2025": {
+      "source_id": "FRP-HISTORY-OOO-2025",
+      "title": "Федеральная рабочая программа «История» 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_istoriya_5-9.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "history",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "b31d053cd5b8484faff58f4c6c40b0dff18a733c9e191a424918d3d89f11d489",
+      "bytes": 2264604,
+      "pages": 228,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-HISTORY-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-GEOGRAPHY-OOO-2025": {
+      "source_id": "FRP-GEOGRAPHY-OOO-2025",
+      "title": "Федеральная рабочая программа «География» 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_geografiya-5-9.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "geography",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "bf7739f713faea9064618ebe04e10ef9e7359e35978dbd457421b93094c7ac7c",
+      "bytes": 1654785,
+      "pages": 181,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-GEOGRAPHY-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-BIOLOGY-OOO-2025": {
+      "source_id": "FRP-BIOLOGY-OOO-2025",
+      "title": "Федеральная рабочая программа «Биология» (базовый уровень) 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_biologiya_5-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "biology",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "16470854fd537ebdfc6cc193c0f30fda1336cd7b6eb76f906266ea49caaaf35f",
+      "bytes": 1518946,
+      "pages": 144,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-BIOLOGY-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-PHYSICS-OOO-2025": {
+      "source_id": "FRP-PHYSICS-OOO-2025",
+      "title": "Федеральная рабочая программа «Физика» (базовый уровень) 7–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_fizika-7-9_baz.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "physics",
+      "grades": [
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "80047c7ae0fe2a3e35d54546a0c3aec478df7cdfca1d8333769cc101502321dc",
+      "bytes": 1239873,
+      "pages": 97,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-PHYSICS-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-CHEMISTRY-OOO-2025": {
+      "source_id": "FRP-CHEMISTRY-OOO-2025",
+      "title": "Федеральная рабочая программа «Химия» (базовый уровень) 8–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_himiya_8-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "chemistry",
+      "grades": [
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "35a0283e8128b81190805bc682034d63456b909a2a80c46524505bdc31985e15",
+      "bytes": 1013499,
+      "pages": 71,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-CHEMISTRY-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-INFORMATICS-OOO-2025": {
+      "source_id": "FRP-INFORMATICS-OOO-2025",
+      "title": "Федеральная рабочая программа «Информатика» (базовый уровень) 7–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_informatika-7-9_baza.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "informatics",
+      "grades": [
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "ee4b4518f7cd8903139c109bfe21d0541dc299281b182b6c9f6d0763c5733cd0",
+      "bytes": 978486,
+      "pages": 66,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-INFORMATICS-OOO-2025.pdf",
+      "note": "Официальная публикация edsoo.ru (2025)"
+    },
+    "FRP-FOREIGN-LANGUAGE-OOO-2025": {
+      "source_id": "FRP-FOREIGN-LANGUAGE-OOO-2025",
+      "title": "Федеральная рабочая программа «Иностранный (английский) язык» 5–9 классы, Москва 2025",
+      "url": "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_angl_5-9.pdf",
+      "doc_type": "frp",
+      "edu_levels": [
+        "ooo"
+      ],
+      "subject_id": "foreign_language",
+      "grades": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "is_normative": true,
+      "sha256": "52b80d38c62ca9545bb2cbecad31a1c545677f21aee09bb3ef66344059c2b24d",
+      "bytes": 2163965,
+      "pages": 263,
+      "checked_on": "2026-09-24",
+      "local_path": "raw/FRP-FOREIGN-LANGUAGE-OOO-2025.pdf",
       "note": "Официальная публикация edsoo.ru (2025)"
     }
   }

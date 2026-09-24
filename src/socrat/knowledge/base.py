@@ -146,6 +146,9 @@ class LocalKnowledgeBase:
 
         # 4. Загрузка поискового индекса
         index_dir = self.settings.knowledge_dir / "index"
+        pages_dir = self.settings.knowledge_dir / "pages"
+        all_chunks: list[Chunk] = []
+
         if (index_dir / "chunks.jsonl").exists():
             try:
                 self.index = KnowledgeIndex.load(index_dir)
@@ -153,18 +156,44 @@ class LocalKnowledgeBase:
                 logger.warning("Failed to load KnowledgeIndex from %s: %s", index_dir, e)
                 self.index = KnowledgeIndex([])
         else:
-            # Если индекса на диске нет, но есть нарезанные чанки или страницы
+            # Если индекса на диске нет, проверяем сначала chunks/, затем pages/
             chunks_dir = self.settings.knowledge_dir / "chunks"
-            all_chunks: list[Chunk] = []
             if chunks_dir.exists():
                 for ch_file in chunks_dir.glob("*.jsonl"):
                     with open(ch_file, encoding="utf-8") as f:
                         for line in f:
                             if line.strip():
                                 all_chunks.append(Chunk.model_validate_json(line))
+
+            if not all_chunks and pages_dir.exists():
+                for pages_file in sorted(pages_dir.glob("*.jsonl")):
+                    sid = pages_file.stem
+                    doc = self._sources.get(sid)
+                    s_id = doc.subject_id if doc else None
+                    try:
+                        doc_chunks = chunk_pages_file(pages_file, sid, s_id)
+                        all_chunks.extend(doc_chunks)
+                    except Exception as e:
+                        logger.warning("Failed to chunk %s: %s", pages_file, e)
+
             self.index = KnowledgeIndex(all_chunks)
+            if all_chunks:
+                try:
+                    self.index.save(index_dir)
+                except Exception as e:
+                    logger.debug("Could not save index to %s: %s", index_dir, e)
 
         self.retriever = Retriever(self.index, self._sources, self.settings)
+
+        # 5. Диагностика целостности для админки (G13)
+        for doc in self._sources.values():
+            if doc.is_normative and doc.doc_type == DocType.FRP:
+                p_file = pages_dir / f"{doc.source_id}.jsonl"
+                if not p_file.exists():
+                    self._problems.append(f"нет pages/ для {doc.source_id} — выполните build")
+                has_outcomes = any(o.source_id == doc.source_id for o in self._outcomes)
+                if not has_outcomes:
+                    self._problems.append(f"нет результатов в каталоге для {doc.source_id} — выполните build")
 
         # База готова, если есть зарегистрированные источники и загруженный каталог
         self._ready = bool(self._sources and self._outcomes)
@@ -180,9 +209,9 @@ class LocalKnowledgeBase:
             doc.subject_id
             for doc in self._sources.values()
             if doc.doc_type == DocType.FRP
-            and (edu_lvl in doc.edu_levels or grade in doc.grades)
+            and (grade in doc.grades if doc.grades else edu_lvl in doc.edu_levels)
             and doc.subject_id
-        }
+        } | {o.subject_id for o in self._outcomes if o.grade == grade and o.subject_id}
 
         res: list[Subject] = []
         for s in self._subjects_def:
@@ -209,6 +238,64 @@ class LocalKnowledgeBase:
 
     def check_topic(self, grade: int, subject_id: str, topic: str) -> TopicCheck:
         """Проверяет соответствие темы учителя программе класса по предмету."""
+        # Fallback для абсолютно чистого репозитория без страниц и индекса (G10)
+        if len(self.index.chunks) == 0:
+            target_outcomes = [
+                o
+                for o in self._outcomes
+                if o.grade == grade and (o.subject_id is None or o.subject_id == subject_id)
+            ]
+            if not target_outcomes:
+                return TopicCheck(
+                    in_program=False,
+                    confidence=0.0,
+                    matched_topics=[],
+                    suggestions=[],
+                    evidence=[],
+                )
+
+            temp_chunks = [
+                Chunk(
+                    chunk_id=o.outcome_id,
+                    source_id=o.source_id,
+                    page=o.page,
+                    text=o.text,
+                    kind=ChunkKind.SUBJECT_RESULT,
+                    grade=o.grade,
+                    subject_id=o.subject_id,
+                    section=o.section,
+                )
+                for o in target_outcomes
+            ]
+            temp_index = KnowledgeIndex(temp_chunks)
+            hits = Retriever(temp_index, self._sources).search(topic, k=5)
+            best_score = hits[0].score if hits else 0.0
+            in_prog = best_score >= 0.4
+
+            matched_topics: list[str] = []
+            for h in hits:
+                if h.score >= 0.4:
+                    first_line = h.chunk.text.split("\n")[0].strip()
+                    matched_topics.append(first_line[:80])
+
+            suggestions: list[str] = []
+            for o in target_outcomes:
+                text_clean = o.text.split("\n")[0].strip().rstrip(";.")
+                if 10 <= len(text_clean) <= 60:
+                    s_title = text_clean[0].upper() + text_clean[1:]
+                    if s_title not in suggestions:
+                        suggestions.append(s_title)
+                        if len(suggestions) >= 5:
+                            break
+
+            return TopicCheck(
+                in_program=in_prog,
+                confidence=min(1.0, max(0.1, best_score)) if in_prog else 0.1,
+                matched_topics=list(dict.fromkeys(matched_topics))[:3],
+                suggestions=suggestions[:5],
+                evidence=hits,
+            )
+
         # 1. Поиск по фрагментам содержания и предметных результатов
         hits = self.retriever.search(
             query=topic,

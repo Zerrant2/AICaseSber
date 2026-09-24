@@ -9,11 +9,11 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 import difflib
 import json
-from pathlib import Path
 import random
+from collections import defaultdict
+from pathlib import Path
 
 from socrat.config import get_settings
 from socrat.contracts import Outcome, OutcomeType
@@ -72,7 +72,6 @@ def generate_report() -> str:
     sample = random.sample(verbatim_outcomes, sample_size) if verbatim_outcomes else []
 
     passed = 0
-    sample_results: list[str] = []
 
     for o in verbatim_outcomes:
         p_text = get_page_text(o.source_id, o.page, pages_dir) or ""
@@ -95,7 +94,9 @@ def generate_report() -> str:
 
     lines.append(f"- Проверено дословных цитат: **{total_verbatim}**")
     lines.append(f"- Успешно сопоставлено со страницей: **{passed}** ({pct:.1f}%)")
-    lines.append("- Целевой норматив (≥ 95%): " + ("✅ **ВЫПОЛНЕН**" if pct >= 95.0 else "❌ **НЕ ВЫПОЛНЕН**"))
+    lines.append(
+        "- Целевой норматив (≥ 95%): " + ("✅ **ВЫПОЛНЕН**" if pct >= 95.0 else "❌ **НЕ ВЫПОЛНЕН**")
+    )
     lines.append("")
     lines.append("### Выборка из 10 проверенных цитат:")
     lines.append("")
