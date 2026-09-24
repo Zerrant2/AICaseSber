@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
 from docx.shared import Mm, Pt
 
 from socrat.config import get_settings
@@ -78,7 +79,38 @@ def test_teacher_docx_has_outcomes_and_pages() -> None:
                     for row in table.rows
                     if len(row.cells) == 8
                 )
+    assert all(
+        row._tr.get_or_add_trPr().find(qn("w:cantSplit")) is not None
+        for table in document.tables
+        if len(table.columns) == 8
+        for row in table.rows[1:]
+    )
+    assert all(
+        paragraph.paragraph_format.keep_with_next
+        for table in document.tables
+        if len(table.rows) > 1
+        for cell in table.rows[0].cells
+        for paragraph in cell.paragraphs
+    )
+    assert all(
+        table.columns[0].width >= Mm(40)
+        and all(
+            paragraph.paragraph_format.keep_with_next
+            for row in table.rows[:-1]
+            for cell in row.cells
+            for paragraph in cell.paragraphs
+        )
+        for table in document.tables
+        if len(table.columns) == 8
+    )
+    map_headings = [
+        index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "Карта результатов"
+    ]
+    assert map_headings and all(
+        'w:type="page"' in document.paragraphs[index - 1]._p.xml for index in map_headings
+    )
     assert "Числовой ответ сам по себе не подтверждает" in text
+    assert "Личностная направленность: Личностная направленность" not in text
     assert abs(document.sections[0].page_width - Mm(297)) < 650
 
 
