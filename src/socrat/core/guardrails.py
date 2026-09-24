@@ -22,7 +22,6 @@ from socrat.contracts import (
 )
 
 from .specs import estimate_work_minutes
-from .validators import _morph
 
 NORM_REF_RE = re.compile(r"(пункт\w*|п\.\s*\d|§|стать\w*\s+\d|раздел\w*\s+\d|\b\d+\.\d+(?:\.\d+)+\b)", re.I)
 FGOS_WORD_RE = re.compile(r"фгос|стандарт|фоп|фрп|приказ", re.I)
@@ -36,31 +35,6 @@ DIAGNOSIS_RE = re.compile(
     re.I,
 )
 MINUTES_RE = re.compile(r"(\d{1,3})\s*(?:мин\w*|’|')", re.I)
-
-
-def detect_names(text: str) -> list[str]:
-    """Похожие на имена/фамилии слова (с заглавной, не в начале предложения). Для предупреждения о ПДн."""
-    morph = _morph()
-    if morph is None or not text:
-        return []
-    found = []
-    for m in re.finditer(r"(?<![.!?]\s)(?<!^)\b([А-ЯЁ][а-яё]{2,})\b", text):
-        word = m.group(1)
-        for p in morph.parse(word)[:2]:
-            if (
-                {"Name"} <= set(p.tag.grammemes)
-                or {"Surn"} <= set(p.tag.grammemes)
-                or {"Patr"} <= set(p.tag.grammemes)
-            ):
-                found.append(word)
-                break
-    return found
-
-
-def mask_names(text: str) -> str:
-    for name in set(detect_names(text)):
-        text = re.sub(rf"\b{re.escape(name)}\b", "[ученик]", text)
-    return text
 
 
 def _outcome_suggestions(outcomes: list[Outcome], k: int = 3) -> list[str]:
@@ -151,20 +125,6 @@ class Guardrails:
                     message_ru=(
                         "Система не ставит диагнозов и не оценивает личность, интеллект или мотивацию ребёнка. "
                         "Она помогает наблюдать учебные действия. Уберите эту просьбу из темы."
-                    ),
-                )
-            )
-
-        # ПДн
-        names = detect_names(free_text)
-        if names:
-            issues.append(
-                GuardrailIssue(
-                    code=GuardrailCode.PERSONAL_DATA,
-                    severity=Severity.WARN,
-                    message_ru=(
-                        "Похоже, в тексте есть имя или фамилия (" + ", ".join(sorted(set(names))[:3]) + "). "
-                        "Данные детей не нужны — они будут заменены на «[ученик]»."
                     ),
                 )
             )
@@ -265,20 +225,6 @@ class Guardrails:
                     message_ru=(
                         "Я не ставлю диагнозов и не оцениваю личность, интеллект или мотивацию. Опишите, какую ошибку "
                         "делают дети в заданиях (что пишут, на каком шаге) — и я предложу гипотезы о причинах и приёмы."
-                    ),
-                )
-            )
-        names = detect_names(req.description)
-        if names:
-            issues.append(
-                GuardrailIssue(
-                    code=GuardrailCode.PERSONAL_DATA,
-                    severity=Severity.WARN,
-                    message_ru=(
-                        "Похоже, в описании есть имя или фамилия ("
-                        + ", ".join(sorted(set(names))[:3])
-                        + "). "
-                        "Перед анализом они будут заменены на «[ученик]». Лучше описывать ошибку без имён."
                     ),
                 )
             )

@@ -7,7 +7,14 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from socrat.knowledge.parser import clean_page_text, find_repeating_lines, get_page_text, parse_and_save_pdf
+from socrat.knowledge.parser import (
+    clean_page_text,
+    find_repeating_lines,
+    get_page_text,
+    get_source_page_range,
+    parse_and_save_pdf,
+    parse_pdf,
+)
 
 
 @pytest.fixture
@@ -67,3 +74,61 @@ def test_repeating_lines_threshold():
     rep = find_repeating_lines(pages_lines, threshold_ratio=0.5)
     assert "Header line" in rep
     assert "Content page 1" not in rep
+
+
+def test_parse_pdf_page_range(tmp_path: Path):
+    """Проверка извлечения только заданного диапазона страниц PDF (G18)."""
+    pdf_path = tmp_path / "multi_doc.pdf"
+    doc = pymupdf.open()
+    for idx in range(1, 6):
+        p = doc.new_page()
+        p.insert_text((50, 50), f"Content of page {idx}")
+    doc.save(pdf_path)
+    doc.close()
+
+    # Извлекаем только страницы 2..4
+    pages = parse_pdf(pdf_path, "MULTI-01", page_range=[2, 4])
+    assert len(pages) == 3
+    page_numbers = [p["page"] for p in pages]
+    assert page_numbers == [2, 3, 4]
+    assert "Content of page 2" in pages[0]["text"]
+    assert "Content of page 4" in pages[2]["text"]
+
+
+def test_parse_and_save_pdf_with_sources_yaml_page_range(tmp_path: Path):
+    """Проверка автоматического применения page_range из sources.yaml (G18)."""
+    pdf_path = tmp_path / "shared_doc.pdf"
+    doc = pymupdf.open()
+    for idx in range(1, 6):
+        p = doc.new_page()
+        p.insert_text((50, 50), f"Shared content page {idx}")
+    doc.save(pdf_path)
+    doc.close()
+
+    sources_file = tmp_path / "sources.yaml"
+    sources_file.write_text(
+        """
+sources:
+  - source_id: TEST-SUB-01
+    title: "Тестовый подраздел"
+    url: "https://example.com/test.pdf"
+    page_range: [2, 3]
+""",
+        encoding="utf-8",
+    )
+
+    pages_dir = tmp_path / "pages"
+    out_file = parse_and_save_pdf(pdf_path, "TEST-SUB-01", pages_dir, sources_file=sources_file)
+    assert out_file.exists()
+
+    assert get_page_text("TEST-SUB-01", 1, pages_dir) is None
+    assert get_page_text("TEST-SUB-01", 2, pages_dir) is not None
+    assert get_page_text("TEST-SUB-01", 3, pages_dir) is not None
+    assert get_page_text("TEST-SUB-01", 4, pages_dir) is None
+
+
+def test_sources_yaml_contains_page_ranges():
+    """Проверка наличия корректных page_range в основном sources.yaml (G18)."""
+    assert get_source_page_range("FRP-MATH-OOO-2025") == [1, 39]
+    assert get_source_page_range("FRP-ALGEBRA-OOO-2025") == [40, 69]
+    assert get_source_page_range("FRP-GEOMETRY-OOO-2025") == [70, 90]

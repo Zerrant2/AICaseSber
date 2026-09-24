@@ -62,8 +62,38 @@ def clean_page_text(raw_text: str, repeating_lines: set[str]) -> str:
     return text
 
 
-def parse_pdf(pdf_path: Path, source_id: str) -> list[dict[str, Any]]:
-    """Парсит PDF-файл и возвращает список страниц с 1-based нумерацией."""
+def get_source_page_range(source_id: str, sources_file: Path | None = None) -> list[int] | None:
+    """Извлекает page_range для source_id из sources.yaml (G18)."""
+    if sources_file is None:
+        from socrat.config import get_settings
+
+        sources_file = get_settings().sources_file
+    if not sources_file.exists():
+        return None
+    try:
+        import yaml
+
+        with open(sources_file, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        for s in data.get("sources", []):
+            if s.get("source_id") == source_id:
+                pr = s.get("page_range")
+                if isinstance(pr, list) and len(pr) == 2:
+                    return [int(pr[0]), int(pr[1])]
+    except Exception as exc:
+        logger.warning("Could not read page_range for %s: %s", source_id, exc)
+    return None
+
+
+def parse_pdf(
+    pdf_path: Path,
+    source_id: str,
+    page_range: list[int] | tuple[int, int] | None = None,
+) -> list[dict[str, Any]]:
+    """Парсит PDF-файл и возвращает список страниц с 1-based нумерацией.
+
+    Если указан page_range=[start, end], извлекает только страницы из этого диапазона (включительно).
+    """
     doc = pymupdf.open(pdf_path)
     total_pages = doc.page_count
 
@@ -78,9 +108,14 @@ def parse_pdf(pdf_path: Path, source_id: str) -> list[dict[str, Any]]:
     repeating = find_repeating_lines(pages_lines)
     logger.debug("Source %s: found %d repeating header/footer lines", source_id, len(repeating))
 
+    start_p = page_range[0] if page_range and len(page_range) >= 1 else 1
+    end_p = page_range[1] if page_range and len(page_range) >= 2 else total_pages
+
     results: list[dict[str, Any]] = []
     for idx in range(total_pages):
         page_num = idx + 1  # 1-based index в PDF
+        if not (start_p <= page_num <= end_p):
+            continue
         cleaned = clean_page_text(pages_raw[idx], repeating)
         results.append(
             {
@@ -102,10 +137,19 @@ def save_pages_jsonl(pages: list[dict[str, Any]], output_file: Path) -> None:
             f.write(json.dumps(p, ensure_ascii=False) + "\n")
 
 
-def parse_and_save_pdf(pdf_path: Path, source_id: str, pages_dir: Path) -> Path:
+def parse_and_save_pdf(
+    pdf_path: Path,
+    source_id: str,
+    pages_dir: Path,
+    page_range: list[int] | tuple[int, int] | None = None,
+    sources_file: Path | None = None,
+) -> Path:
     """Парсит PDF и записывает результат в <pages_dir>/<source_id>.jsonl."""
+    if page_range is None:
+        page_range = get_source_page_range(source_id, sources_file)
+
     out_path = pages_dir / f"{source_id}.jsonl"
-    pages = parse_pdf(pdf_path, source_id)
+    pages = parse_pdf(pdf_path, source_id, page_range=page_range)
     save_pages_jsonl(pages, out_path)
     # Сбрасываем кэш страниц для данного source_id, если он был
     _load_pages_map.cache_clear()

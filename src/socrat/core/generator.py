@@ -53,7 +53,7 @@ from socrat.contracts import (
 from socrat.prompts import PROMPT_VERSION, render
 
 from .drafts import TaskDraft, VariantDraft, compact_schema
-from .guardrails import Guardrails, mask_names
+from .guardrails import Guardrails
 from .links import make_link
 from .mathcheck import answer_value, evaluate, fmt, parse_number, parse_number_mapping, replace_numbers
 from .specs import (
@@ -256,13 +256,8 @@ class LLMWorkGenerator:
     # ================================================================== context
 
     def _sanitize(self, req: GenerationRequest, guard: GuardrailResult) -> GenerationRequest:
-        if any(i.code == GuardrailCode.PERSONAL_DATA for i in guard.issues):
-            return req.model_copy(
-                update={
-                    "topic": mask_names(req.topic),
-                    "teacher_note": mask_names(req.teacher_note) if req.teacher_note else None,
-                }
-            )
+        """Запрос передаётся как есть. Автозамена имён на «[ученик]» убрана 24.09: она принимала
+        фамилии учёных и писателей из темы («Законы Ньютона») за данные детей."""
         return req
 
     async def _context(self, req: GenerationRequest) -> _Ctx:
