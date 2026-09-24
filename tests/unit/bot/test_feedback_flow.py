@@ -17,7 +17,19 @@ from aiogram.types import CallbackQuery, Message
 from socrat.app import build_services, close_services
 from socrat.bot import feedback_flow, texts
 from socrat.config import get_settings
-from socrat.contracts import DiagnosticWork, Rating, Role, SessionInfo
+from socrat.contracts import (
+    DiagnosticWork,
+    GenerationRequest,
+    GuardrailCode,
+    GuardrailIssue,
+    LevelChoice,
+    Rating,
+    Role,
+    SessionInfo,
+    Severity,
+)
+from socrat.core import build_core
+from socrat.testing.scripted import ScriptedLLM
 
 FIXTURE = Path(__file__).resolve().parents[3] / "data/fixtures/work_math3_all.json"
 
@@ -161,5 +173,58 @@ async def test_regeneration_sends_revised_documents(settings, monkeypatch: pytes
         status.edit_text.assert_awaited_with(texts.FOLLOWUP_REGENERATED)
         assert await flow_state.get_state() is None
         assert await services.works.get(work.work_id) is not None
+    finally:
+        await close_services(services)
+
+
+async def test_regeneration_shows_only_new_warnings(settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    services = await build_services(settings)
+    generator, _, _ = build_core(settings, services.knowledge, llm=ScriptedLLM())
+    services.generator = generator
+    work = await generator.generate(
+        GenerationRequest(
+            grade=3,
+            subject_id="math",
+            subject_name="Математика",
+            topic="Внетабличное умножение и деление",
+            level=LevelChoice.BASIC,
+            task_count=4,
+        )
+    )
+    work.warnings.append(
+        GuardrailIssue(code=GuardrailCode.OK, severity=Severity.WARN, message_ru="Старое замечание")
+    )
+    await services.works.save(work, 7)
+    flow_state = state()
+
+    @asynccontextmanager
+    async def no_chat_action(**_kwargs):
+        yield
+
+    monkeypatch.setattr(feedback_flow.ChatActionSender, "upload_document", no_chat_action)
+    try:
+        task_id = work.variants[0].tasks[0].task_id
+        await feedback_flow.regeneration_task(
+            callback(f"regentask:{work.work_id}:{task_id}"), flow_state, services
+        )
+        status = MagicMock(spec=Message)
+        status.edit_text = AsyncMock()
+        item = MagicMock(spec=Message)
+        item.text = "Замени на вычитание и сложение"
+        item.chat = SimpleNamespace(id=123)
+        item.bot = MagicMock()
+        item.answer = AsyncMock(return_value=status)
+        item.answer_document = AsyncMock()
+        controller = feedback_flow.GenerationController(1)
+
+        await feedback_flow.regeneration_wish(item, flow_state, services, session(), controller, settings)
+
+        assert item.answer_document.await_count == 2
+        final_message = status.edit_text.await_args.args[0]
+        assert "Задание заменено, но есть замечание:" in final_message
+        assert "выполнить не удалось" in final_message
+        assert "Старое замечание" not in final_message
+        assert "просмотрите задание перед использованием" in final_message
+        assert await flow_state.get_state() is None
     finally:
         await close_services(services)

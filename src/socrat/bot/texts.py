@@ -131,6 +131,11 @@ FOLLOWUP_WISH_LONG = "Пожелание должно быть не длинне
 FOLLOWUP_REGENERATING = "⏳ Перегенерирую задание…"
 FOLLOWUP_PROGRESS = "⏳ {description}"
 FOLLOWUP_REGENERATED = "Задание обновлено. Новые документы отправлены."
+FOLLOWUP_REGENERATED_WITH_WARNINGS = (
+    "Задание заменено, но есть замечание:\n"
+    "{warnings}\n\n"
+    "Документы отправлены — просмотрите задание перед использованием."
+)
 FOLLOWUP_REGENERATE_FAILED = "Не удалось перегенерировать задание. Попробуйте ещё раз."
 FOLLOWUP_NEXT_ACTION = "Что сделать дальше?"
 FOLLOWUP_CHOOSE_OBSERVATION = "Выберите задание или вопрос для рефлексии."
