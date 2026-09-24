@@ -37,6 +37,8 @@ UUD_TRIGGER_WORDS: dict[UUDGroup, tuple[str, ...]] = {
         "запиши действие",
         "запиши выражение",
         "запиши решение",
+        "двумя способами",
+        "способ",
     ),
     UUDGroup.REGULATORY: (
         "план",
