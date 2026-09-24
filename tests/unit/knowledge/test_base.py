@@ -306,3 +306,9 @@ async def test_ingest_school_material(test_kb: LocalKnowledgeBase):
     assert not doc.is_normative
     assert doc.title == "school_work.pdf"
     assert test_kb.get_source(doc.source_id) is not None
+
+
+def test_check_topic_lemma_forms_same_grade(test_kb: LocalKnowledgeBase):
+    """«Имя прилагательное» в 3 классе: в каталоге — «имена прилагательные» (разные формы слова «имя»)."""
+    res = test_kb.check_topic(3, "russian", "Имя прилагательное")
+    assert res.in_program, res

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import io
 import json
@@ -208,9 +209,23 @@ RUSSIAN_ENDINGS: tuple[str, ...] = (
 )
 
 
+@functools.lru_cache(maxsize=1)
+def _morph():
+    try:
+        import pymorphy3
+
+        return pymorphy3.MorphAnalyzer()
+    except Exception:  # pragma: no cover - нет словарей
+        return None
+
+
+@functools.lru_cache(maxsize=50_000)
 def stem_ru(word: str) -> str:
-    """Простой стеммер для русского языка."""
-    w = word.lower()
+    """Основа слова: сначала лемма pymorphy3 («имена» → «имя»), затем отсечение окончания."""
+    w = word.lower().replace("ё", "е")
+    morph = _morph()
+    if morph is not None and w.isalpha():
+        w = morph.parse(w)[0].normal_form.replace("ё", "е")
     for end in RUSSIAN_ENDINGS:
         if w.endswith(end) and len(w) - len(end) >= 3:
             return w[: -len(end)]
