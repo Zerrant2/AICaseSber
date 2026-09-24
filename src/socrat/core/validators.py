@@ -12,7 +12,7 @@ import re
 from fractions import Fraction
 from functools import lru_cache
 
-from socrat.contracts import Level, Task, TaskKind, UUDGroup, Variant
+from socrat.contracts import LABELS_RU, Level, Task, TaskKind, UUDGroup, Variant
 
 from .mathcheck import MathError, answer_value, evaluate, fmt, numbers_in, operands, parse_number
 from .specs import KINDS, UUD_TRIGGER_WORDS, Slot
@@ -185,11 +185,11 @@ def check_leak(task: Task) -> list[str]:
 def trigger_ok(group: UUDGroup, trigger: str, visible: str) -> tuple[bool, str]:
     t, v = _norm(trigger), _norm(visible)
     if not t:
-        return False, "пустой trigger"
+        return False, "не указана цитата-основание"
     if t not in v:
-        return False, "trigger не найден дословно в формулировке"
+        return False, "цитаты-основания нет в тексте задания"
     if not any(w in t for w in UUD_TRIGGER_WORDS[group]):
-        return False, "в trigger нет требования, делающего это действие видимым"
+        return False, "в формулировке нет требования, по которому это действие видно"
     return True, ""
 
 
@@ -204,7 +204,8 @@ def check_uud(task: Task, slot: Slot | None) -> list[str]:
             kept.append(ind)
         else:
             task.checks.notes.append(
-                f"Снят признак «{ind.group.value}»: {why or 'тип задания не позволяет это наблюдать'}."
+                f"Снят признак «{LABELS_RU[ind.group.value].lower()} УУД»: "
+                f"{why or 'в заданиях этого типа такое действие не наблюдается'}."
             )
     task.uud_indicators = kept
     if slot is not None:
@@ -221,9 +222,36 @@ def check_uud(task: Task, slot: Slot | None) -> list[str]:
 # --------------------------------------------------------------------------- language
 
 
+# Служебные слова из промпта, которые модель иногда переносит в текст для ученика.
+SERVICE_MARKERS = (
+    "student_text",
+    "expected_answer",
+    "solution_steps",
+    "trigger",
+    "uud",
+    "ууд",
+    "cognitive",
+    "regulatory",
+    "communicative",
+    "познавательн",
+    "регулятивн",
+    "коммуникативн",
+    "обязательно сделать наблюдаемым",
+    "требование вроде",
+    "дословн",
+    "json",
+)
+
+
 def check_language(task: Task) -> list[str]:
     errors: list[str] = []
     low = _norm(student_fields(task))
+    leaked = [w for w in SERVICE_MARKERS if re.search(rf"(?<![а-яa-z]){re.escape(_norm(w))}", low)]
+    if leaked:
+        errors.append(
+            f"Задание {task.number}: в тексте для ученика служебные слова из инструкции ({', '.join(leaked[:3])}) — "
+            "перепиши student_text и support простым языком для ребёнка, без этих слов."
+        )
     for w in STUDENT_FORBIDDEN:
         if w in low:
             errors.append(f"Задание {task.number}: в тексте для ученика есть ярлык «{w}» — убери.")
@@ -231,6 +259,14 @@ def check_language(task: Task) -> list[str]:
         " ".join(
             [task.conducting_note, task.personal_orientation or ""]
             + [e.interpretation for e in task.typical_errors]
+        )
+    )
+    # «Это не значит, что ребёнок неспособен» — предостережение педагогу, а не ярлык: такие фразы не считаем.
+    teacher_text = " ".join(
+        sent
+        for sent in re.split(r"(?<=[.!?;])\s+", teacher_text)
+        if not re.search(
+            r"\bне (значит|означает|говорит|следует|делайте|делать|считайте|считать|называйте|стоит)\b", sent
         )
     )
     for w in DIAGNOSIS_WORDS:
@@ -344,3 +380,49 @@ def check_levels(variants: list[Variant]) -> list[str]:
         if amax and emax and amax < emax:
             warnings.append("В сложном варианте числа проще, чем в лёгком.")
     return warnings
+
+
+# --------------------------------------------------------------------------- для педагога
+
+_GROUP_RU = {"cognitive": "познавательное", "regulatory": "регулятивное", "communicative": "коммуникативное"}
+_TEACHER_RULES: tuple[tuple[str, str], ...] = (
+    (
+        r"не видно действия группы «(\w+)».*?вроде «([^»]*)».*",
+        "в формулировке нет требования, по которому видно {g1} действие (например, «{g2}»)",
+    ),
+    (
+        r"недопустимая формулировка «([^»]*)».*",
+        "в тексте есть оценочное слово («{g1}…») — замените нейтральным",
+    ),
+    (r"в тексте для ученика есть ярлык «([^»]*)».*", "в тексте для ученика есть ярлык «{g1}» — уберите"),
+    (r"в тексте для ученика виден ответ (\S+) — .*", "в тексте для ученика виден ответ {g1}"),
+    (r"подсказка содержит готовое действие «([^»]*)».*", "подсказка раскрывает решение («{g1}»)"),
+    (
+        r"в тексте для ученика служебные слова из инструкции \(([^)]*)\).*",
+        "в тексте для ученика остались служебные слова ({g1})",
+    ),
+    (r"(шаг \d+: \S+ = \S+, а записано \S+)\..*", "ошибка вычисления: {g1}"),
+    (r"(шаг \d+): число (\S+) не встречается.*", "{g1}: число {g2} не взято из условия"),
+    (r"у ответа «([^»]*)» нет вычислений.*", "у ответа «{g1}» нет записанного решения"),
+    (r"(шаг \d+): результат (\S+) — в начальной школе.*", "{g1}: дробный или отрицательный результат {g2}"),
+)
+
+
+def for_teacher(error: str) -> str:
+    """Текст ошибки проверки для педагога: без инструкций модели и служебных полей (student_text, trigger…)."""
+    m = re.match(r"(Задание \d+(?:, шаг \d+)?): (.*)", error, re.S)
+    head, body = (m.group(1), m.group(2)) if m else ("", error)
+    if head.count(",") and "шаг" in head:  # «Задание 3, шаг 2: …» → шаг уходит в тело
+        num, step = head.split(", ", 1)
+        head, body = num, f"{step}: {body}"
+    for pattern, template in _TEACHER_RULES:
+        mm = re.match(pattern, body, re.S)
+        if mm:
+            groups = {f"g{i}": _GROUP_RU.get(v, v) for i, v in enumerate(mm.groups(), start=1)}
+            return template.format(**groups)
+    # по умолчанию — убрать повелительные подсказки модели после тире/точки
+    body = re.split(
+        r"\s—\s(?=[а-яё]+[ийь]\b)|\.\s(?=(?:Исправь|Добавь|Составь|Перепиши|Укажи|Убери|Решение должно))",
+        body,
+    )[0]
+    return body.rstrip(" .")
