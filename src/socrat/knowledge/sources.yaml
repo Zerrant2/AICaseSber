@@ -1,8 +1,9 @@
 # Реестр документов нормативной базы. ВЛАДЕЛЕЦ: Gemini (knowledge).
 # Каждый URL ОБЯЗАТЕЛЬНО проверить вручную (открывается, это нужный документ, актуальная редакция).
 # Поля: source_id, title, url, doc_type (fgos|fop|frp), edu_levels, subject_id, grades, note
-# Затравка — два источника из кейса SK01 (проверены организаторами 21.09.2026):
+
 sources:
+  # ============================== Приоритет P1 ==============================
   - source_id: FGOS-NOO-286
     title: "ФГОС НОО, приказ Минпросвещения России от 31.05.2021 № 286"
     url: "https://publication.pravo.gov.ru/Document/View/0001202107050028"
@@ -11,6 +12,7 @@ sources:
     subject_id: null
     grades: [1, 2, 3, 4]
     note: "Первоначальное опубликование; последующие изменения не проверялись"
+
   - source_id: FRP-MATH-2025
     title: "Федеральная рабочая программа «Математика» 1–4 классы, Москва 2025"
     url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_matematika_1-4.pdf"
@@ -19,5 +21,139 @@ sources:
     subject_id: math
     grades: [1, 2, 3, 4]
     note: "Источник справочника кейса SK01 (стр. 18–20, 23 по нумерации PDF)"
-  # TODO(Gemini): ФГОС ООО (287), ФГОС СОО (413, актуальная редакция), ФОП НОО/ООО/СОО,
-  # ФРП по всем предметам 1–11 (edsoo.ru). См. docs/tasks/TASKS_GEMINI.md, задача G1.
+
+  - source_id: FRP-RUSSIAN-NOO-2025
+    title: "Федеральная рабочая программа «Русский язык» 1–4 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_russkij-yazyk_1-4.pdf"
+    doc_type: frp
+    edu_levels: [noo]
+    subject_id: russian
+    grades: [1, 2, 3, 4]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-LITERARY-READING-NOO-2025
+    title: "Федеральная рабочая программа «Литературное чтение» 1–4 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_literaturnoe-chtenie_1-4.pdf"
+    doc_type: frp
+    edu_levels: [noo]
+    subject_id: literary_reading
+    grades: [1, 2, 3, 4]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-WORLD-NOO-2025
+    title: "Федеральная рабочая программа «Окружающий мир» 1–4 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_noo_frp_okruzhayushhij-mir_1-4.pdf"
+    doc_type: frp
+    edu_levels: [noo]
+    subject_id: world
+    grades: [1, 2, 3, 4]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  # ============================== Приоритет P2 ==============================
+  - source_id: FGOS-OOO-287
+    title: "ФГОС ООО, приказ Минпросвещения России от 31.05.2021 № 287"
+    url: "https://publication.pravo.gov.ru/Document/View/0001202107050027"
+    doc_type: fgos
+    edu_levels: [ooo]
+    subject_id: null
+    grades: [5, 6, 7, 8, 9]
+    note: "Первоначальное опубликование; актуальная редакция 2021"
+
+  - source_id: FGOS-SOO-413
+    title: "ФГОС СОО, приказ Минобрнауки России от 17.05.2012 № 413"
+    url: "https://publication.pravo.gov.ru/Document/View/0001201206210006"
+    doc_type: fgos
+    edu_levels: [soo]
+    subject_id: null
+    grades: [10, 11]
+    note: "Первоначальное опубликование"
+
+  - source_id: FRP-MATH-OOO-2025
+    title: "Федеральная рабочая программа «Математика» (базовый уровень) 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_matematika-5-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: math
+    grades: [5, 6, 7, 8, 9]
+    note: "Включает курсы: Математика 5–6, Алгебра 7–9, Геометрия 7–9, Вероятность и статистика 7–9"
+
+  - source_id: FRP-RUSSIAN-OOO-2025
+    title: "Федеральная рабочая программа «Русский язык» 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_russkij-yazyk_5-9.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: russian
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-LITERATURE-OOO-2025
+    title: "Федеральная рабочая программа «Литература» 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_literatura_5-9.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: literature
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-HISTORY-OOO-2025
+    title: "Федеральная рабочая программа «История» 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_istoriya_5-9.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: history
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-GEOGRAPHY-OOO-2025
+    title: "Федеральная рабочая программа «География» 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_geografiya-5-9.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: geography
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-BIOLOGY-OOO-2025
+    title: "Федеральная рабочая программа «Биология» (базовый уровень) 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_biologiya_5-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: biology
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-PHYSICS-OOO-2025
+    title: "Федеральная рабочая программа «Физика» (базовый уровень) 7–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_fizika-7-9_baz.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: physics
+    grades: [7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-CHEMISTRY-OOO-2025
+    title: "Федеральная рабочая программа «Химия» (базовый уровень) 8–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_himiya_8-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: chemistry
+    grades: [8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-INFORMATICS-OOO-2025
+    title: "Федеральная рабочая программа «Информатика» (базовый уровень) 7–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_informatika-7-9_baza.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: informatics
+    grades: [7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
+
+  - source_id: FRP-FOREIGN-LANGUAGE-OOO-2025
+    title: "Федеральная рабочая программа «Иностранный (английский) язык» 5–9 классы, Москва 2025"
+    url: "https://edsoo.ru/wp-content/uploads/2025/07/2025_ooo_frp_angl_5-9.pdf"
+    doc_type: frp
+    edu_levels: [ooo]
+    subject_id: foreign_language
+    grades: [5, 6, 7, 8, 9]
+    note: "Официальная публикация edsoo.ru (2025)"
