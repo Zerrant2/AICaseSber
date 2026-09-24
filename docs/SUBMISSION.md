@@ -16,7 +16,7 @@ git switch main
 git pull --ff-only origin main
 git status --short
 git log --all --name-only --pretty=format: -- .env data/socrat.db data/knowledge/raw
-$secretFound = git log -p --all | Select-String -Quiet -Pattern 's[k]-or-', 'TELEGRAM_BOT_TOKEN=\s*\d{8,10}:[A-Za-z0-9_-]{35,}'
+$secretFound = [bool](git log -p --all | Select-String -Quiet -Pattern 's[k]-or-', 'TELEGRAM_BOT_TOKEN=\s*\d{8,10}:[A-Za-z0-9_-]{35,}')
 "Подозрение на ключ или токен в истории: $secretFound"
 ```
 
