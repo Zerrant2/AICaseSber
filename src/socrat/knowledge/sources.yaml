@@ -1,6 +1,7 @@
 # Реестр документов нормативной базы. ВЛАДЕЛЕЦ: Gemini (knowledge).
 # Каждый URL ОБЯЗАТЕЛЬНО проверить вручную (открывается, это нужный документ, актуальная редакция).
-# Поля: source_id, title, url, doc_type (fgos|fop|frp), edu_levels, subject_id, grades, note
+# Поля: source_id, title, url, doc_type (fgos|fop|frp), edu_levels, subject_id, grades, note, download
+# download: false — источник только для ссылки (страница просмотра, не PDF): не скачивается при обновлении.
 
 sources:
   # ============================== Приоритет P1 ==============================
@@ -12,6 +13,7 @@ sources:
     subject_id: null
     grades: [1, 2, 3, 4]
     note: "Первоначальное опубликование; последующие изменения не проверялись"
+    download: false  # Document/View — HTML-страница, каталог строится по ФРП (issue #24)
 
   - source_id: FRP-MATH-2025
     title: "Федеральная рабочая программа «Математика» 1–4 классы, Москва 2025"
@@ -58,6 +60,7 @@ sources:
     subject_id: null
     grades: [5, 6, 7, 8, 9]
     note: "Первоначальное опубликование; актуальная редакция 2021"
+    download: false  # Document/View — HTML-страница, каталог строится по ФРП (issue #24)
 
   - source_id: FGOS-SOO-413
     title: "ФГОС СОО, приказ Минобрнауки России от 17.05.2012 № 413"
@@ -67,6 +70,7 @@ sources:
     subject_id: null
     grades: [10, 11]
     note: "Первоначальное опубликование"
+    download: false  # Document/View — HTML-страница, каталог строится по ФРП (issue #24)
 
   - source_id: FRP-MATH-OOO-2025
     title: "Федеральная рабочая программа «Математика» 5–6 классы, Москва 2025"
